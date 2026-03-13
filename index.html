@@ -11,7 +11,8 @@
 <div id="app">
   <!-- ===== TOOLBAR ===== -->
   <div class="toolbar">
-    <span class="app-title">PMI Gantt Tool</span>
+    <a href="https://todopmp.com" target="_blank" rel="noopener" class="app-title" style="text-decoration:none;color:inherit">PMI Gantt Tool</a>
+    <span class="app-subtitle">by todopmp.com</span>
     <input class="project-name-input" v-model="project.name" placeholder="Nombre del proyecto">
     <div class="toolbar-separator"></div>
 
@@ -470,6 +471,18 @@
     </div>
   </div>
 
+  <!-- ===== BANNER TODOPMP ===== -->
+  <div class="todopmp-banner">
+    <a href="https://todopmp.com/procesos-pmbok/" target="_blank" rel="noopener" class="todopmp-banner-link">
+      <span class="todopmp-banner-icon">📋</span>
+      <div class="todopmp-banner-text">
+        <strong>40 Procesos PMBOK® Guide - Octava Edicion</strong>
+        <span>Explora los procesos PMBOK 8 con explicaciones detalladas de cada entrada, herramienta y salida. Haz clic para ver mas.</span>
+      </div>
+      <span class="todopmp-banner-arrow">→</span>
+    </a>
+  </div>
+
   <!-- ===== STATUS BAR ===== -->
   <div class="status-bar">
     <div class="status-item">
@@ -486,6 +499,9 @@
       Inicio: {{ project.startDate }} |
       Fin: {{ projectEndDate }} |
       Duracion: {{ projectDurationDays }} dias
+    </div>
+    <div class="status-item status-branding">
+      <a href="https://todopmp.com" target="_blank" rel="noopener">todopmp.com</a>
     </div>
   </div>
 
