@@ -39,6 +39,20 @@ const app = createApp({
       project.tasks.filter(t => t.isCritical && !t.isSummary)
     );
 
+    const projectEndDate = computed(() => {
+      const dates = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate));
+      if (dates.length === 0) return '-';
+      return new Date(Math.max(...dates)).toISOString().split('T')[0];
+    });
+
+    const projectDurationDays = computed(() => {
+      const ends = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate));
+      if (ends.length === 0) return 0;
+      const start = new Date(project.startDate + 'T00:00:00');
+      const end = new Date(Math.max(...ends));
+      return ScheduleEngine.getWorkdaysBetween(start, end, project.calendarWorkdays);
+    });
+
     // ---- Methods ----
 
     // Toast notifications
@@ -61,10 +75,22 @@ const app = createApp({
     function recalculate() {
       DataModel.recalculateWBS(project.tasks);
       ScheduleEngine.calculate(project);
+      autoCalculateCosts();
       updateGantt();
       updateEVM();
       checkOverallocations();
       saveToLocalStorage();
+    }
+
+    function autoCalculateCosts() {
+      for (const task of project.tasks) {
+        if (task.isSummary) continue;
+        if (task.resourceAssignments.length === 0) continue;
+        const cost = ResourceEngine.calculateTaskResourceCost(task, project);
+        if (cost > 0) {
+          task.plannedCost = Math.round(cost * 100) / 100;
+        }
+      }
     }
 
     function updateGantt() {
@@ -643,6 +669,7 @@ const app = createApp({
       showResourceModal, editingResource, showAssignModal, assigningTask,
       // Computed
       orderedTasks, totalBudget, totalActualCost, criticalTasks, scurveSvg, histogramData,
+      projectEndDate, projectDurationDays,
       // Methods
       toast, newProject, recalculate, updateGantt, updateEVM,
       addTask, addMilestone, deleteTask, indentTask, outdentTask,
