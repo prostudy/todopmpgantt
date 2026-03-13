@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gantt PMI - Test Suite</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      padding: 20px; 
+      background: #f5f5f5;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { color: #2c3e50; margin-bottom: 20px; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      color: #7f8c8d;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+    .passed { color: #27ae60; }
+    .failed { color: #e74c3c; }
+    .skipped { color: #f39c12; }
+    
+    .test-results {
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    .test-group {
+      border-bottom: 1px solid #ecf0f1;
+    }
+    .test-group-header {
+      background: #34495e;
+      color: white;
+      padding: 15px 20px;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .test-group-header:hover {
+      background: #2c3e50;
+    }
+    .test-item {
+      padding: 12px 20px;
+      border-bottom: 1px solid #ecf0f1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .test-item:last-child {
+      border-bottom: none;
+    }
+    .test-name {
+      flex: 1;
+    }
+    .test-status {
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .test-status.pass {
+      background: #d4edda;
+      color: #155724;
+    }
+    .test-status.fail {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .test-status.skip {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .test-error {
+      margin-top: 8px;
+      padding: 10px;
+      background: #f8d7da;
+      border-left: 3px solid #e74c3c;
+      font-family: monospace;
+      font-size: 12px;
+      color: #721c24;
+      white-space: pre-wrap;
+    }
+    .test-duration {
+      color: #7f8c8d;
+      font-size: 11px;
+      margin-left: 10px;
+    }
+    .run-button {
+      background: #3498db;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    .run-button:hover {
+      background: #2980b9;
+    }
+    .run-button:disabled {
+      background: #95a5a6;
+      cursor: not-allowed;
+    }
+    .progress-bar {
+      height: 4px;
+      background: #ecf0f1;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #3498db;
+      transition: width 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 Gantt PMI - Test Suite</h1>
+    
+    <button class="run-button" id="runTests">Ejecutar Tests</button>
+    
+    <div class="progress-bar" id="progressBar" style="display:none">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+    
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-value" id="totalTests">0</div>
+        <div class="stat-label">Total Tests</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value passed" id="passedTests">0</div>
+        <div class="stat-label">Passed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value failed" id="failedTests">0</div>
+        <div class="stat-label">Failed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="duration">0ms</div>
+        <div class="stat-label">Duration</div>
+      </div>
+    </div>
+    
+    <div class="test-results" id="results"></div>
+  </div>
+
+  <!-- Load dependencies -->
+  <script src="../js/data-model.js"></script>
+  <script src="../js/schedule-engine.js"></script>
+  <script src="../js/evm-engine.js"></script>
+  <script src="../js/resource-engine.js"></script>
+  <script src="../js/csv-manager.js"></script>
+  
+  <!-- Load test suites -->
+  <script src="test-suite.js"></script>
+  <script src="test-data-model.js"></script>
+  <script src="test-schedule-engine.js"></script>
+  <script src="test-evm-engine.js"></script>
+  <script src="test-resource-engine.js"></script>
+  <script src="test-csv-manager.js"></script>
+  
+  <script>
+    document.getElementById('runTests').addEventListener('click', async () => {
+      const button = document.getElementById('runTests');
+      button.disabled = true;
+      button.textContent = 'Ejecutando...';
+      
+      document.getElementById('progressBar').style.display = 'block';
+      
+      await TestRunner.runAll();
+      
+      button.disabled = false;
+      button.textContent = 'Ejecutar Tests';
+      document.getElementById('progressBar').style.display = 'none';
+    });
+  </script>
+</body>
+</html>

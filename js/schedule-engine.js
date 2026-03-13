@@ -209,7 +209,13 @@ const ScheduleEngine = {
 
       if (task.earlyStart != null) {
         task.startDate = this.addWorkdays(startDate, task.earlyStart, workdays);
-        task.endDate = this.addWorkdays(startDate, task.earlyFinish, workdays);
+        // EF en CPM = "fin del ultimo dia", no "inicio del siguiente"
+        // Para hitos (duracion 0), endDate = startDate
+        if (task.duration === 0) {
+          task.endDate = task.startDate;
+        } else {
+          task.endDate = this.addWorkdays(startDate, task.earlyFinish - 1, workdays);
+        }
       }
     }
   },

@@ -17,7 +17,7 @@ const ResourceEngine = {
     }
 
     // Para cada dia laboral, sumar la carga de cada recurso
-    const allDates = tasks.flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+    const allDates = tasks.flatMap(t => [new Date(t.startDate + 'T00:00:00'), new Date(t.endDate + 'T00:00:00')]);
     if (allDates.length === 0) return loadMap;
 
     const minDate = new Date(Math.min(...allDates));
