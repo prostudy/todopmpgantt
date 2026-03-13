@@ -1,0 +1,13 @@
+WBS,Nombre,Duracion (dias),Predecesores,Costo Planificado,Costo Real,% Completado,Hito,Nivel,Notas
+1,Produccion de Panes,10,,0,0,0,No,0,Tarea resumen
+1.1,Pan 1,1,,1,1,100,No,1,Completado sin problemas
+1.2,Pan 2,1,2,1,1,100,No,1,Completado sin problemas
+1.3,"Pan 3 (se quemo 1, se rehizo)",1,3,1,2,100,No,1,Se quemo un pan - costo doble por desperdicio
+1.4,"Pan 4 (se quemo 1, se rehizo)",1,4,1,2,100,No,1,Se quemo un pan - costo doble por desperdicio
+1.5,Pan 5,1,5,1,0,0,No,1,No completado al momento de la medicion
+1.6,Pan 6,1,6,1,0,0,No,1,
+1.7,Pan 7,1,7,1,0,0,No,1,
+1.8,Pan 8,1,8,1,0,0,No,1,
+1.9,Pan 9,1,9,1,0,0,No,1,
+1.10,Pan 10,1,10,1,0,0,No,1,
+2,Entrega de produccion,0,11,0,0,0,Si,0,Hito: todos los panes entregados

@@ -1,0 +1,105 @@
+============================================================
+  EJEMPLO: PANADERIA - ANALISIS DE VALOR GANADO (EVM)
+============================================================
+
+ESCENARIO:
+----------
+Tu personal esta preparando panes. El costo de produccion por
+cada pan es de $1. Se programo preparar 1 pan por hora (dia).
+Se deben producir 10 panes en total.
+
+Al termino de la quinta hora quieres medir tu eficiencia:
+- Deberias tener 5 panes preparados con un costo de $5
+- Sin embargo, solo tienes 4 panes listos
+- Y quemaste 2 panes (desperdicio)
+
+COMO IMPORTAR:
+--------------
+1. Abrir index.html en el navegador
+2. Clic en "Importar CSV/JSON"
+3. Seleccionar: panaderia_valor_ganado.json
+4. Clic en "Recalcular"
+5. Ir a la pestana "EVM Dashboard"
+
+DATOS DEL EJEMPLO:
+------------------
+  Plan: 10 panes, 1 por dia, $1 cada uno
+  Fecha de estado: Dia 5 laboral (lunes 13 abril, fin del 5to dia de trabajo)
+
+  Panes 1-2: Completados normalmente ($1 c/u)
+  Pan 3:     Completado pero se quemo 1 intento ($2 real)
+  Pan 4:     Completado pero se quemo 1 intento ($2 real)
+  Pan 5:     NO completado (atrasado)
+  Panes 6-10: Pendientes
+
+METRICAS EVM ESPERADAS:
+------------------------
+
+  BAC (Budget at Completion) = $10
+  Presupuesto total del proyecto: 10 panes x $1 = $10
+
+  PV (Planned Value) = $5
+  Valor planificado a la hora 5: debiamos tener 5 panes = $5
+
+  EV (Earned Value) = $4
+  Valor ganado: solo 4 panes completados x $1 = $4
+
+  AC (Actual Cost) = $6
+  Costo real: 4 panes buenos + 2 quemados = 6 x $1 = $6
+
+  --- VARIANZAS ---
+
+  SV (Schedule Variance) = EV - PV = $4 - $5 = -$1
+  INTERPRETACION: Estamos $1 atrasados en cronograma
+  (nos falta 1 pan de lo que debiamos tener)
+
+  CV (Cost Variance) = EV - AC = $4 - $6 = -$2
+  INTERPRETACION: Estamos $2 por encima del presupuesto
+  (los 2 panes quemados costaron sin producir valor)
+
+  --- INDICES DE DESEMPENO ---
+
+  SPI (Schedule Performance Index) = EV / PV = 4/5 = 0.80
+  INTERPRETACION: Por cada $1 de trabajo planificado, solo
+  completamos $0.80. Estamos al 80% de eficiencia en tiempo.
+  SPI < 1 = ATRASADOS
+
+  CPI (Cost Performance Index) = EV / AC = 4/6 = 0.667
+  INTERPRETACION: Por cada $1 gastado, solo generamos $0.67
+  de valor. Eficiencia de costo del 67%.
+  CPI < 1 = SOBRECOSTO
+
+  --- ESTIMACIONES ---
+
+  EAC (Estimate at Completion) = BAC / CPI = 10 / 0.667 = $15
+  INTERPRETACION: Si seguimos al mismo ritmo de desperdicio,
+  el proyecto costara $15 en lugar de $10.
+
+  ETC (Estimate to Complete) = EAC - AC = $15 - $6 = $9
+  INTERPRETACION: Necesitamos $9 mas para terminar.
+
+  VAC (Variance at Completion) = BAC - EAC = $10 - $15 = -$5
+  INTERPRETACION: Tendremos un sobrecosto de $5 al final.
+
+  TCPI (To-Complete Performance Index) = (BAC - EV) / (BAC - AC)
+       = (10 - 4) / (10 - 6) = 6/4 = 1.5
+  INTERPRETACION: Para terminar dentro del presupuesto original,
+  necesitamos una eficiencia de 1.5 (150%) de aqui en adelante.
+  Es decir, debemos ser 50% mas eficientes que el plan original.
+  TCPI > 1 = DIFICIL DE LOGRAR
+
+CONCLUSIONES PARA EL ESTUDIANTE:
+---------------------------------
+1. El proyecto esta ATRASADO (SPI = 0.80, falta 1 pan)
+2. El proyecto esta en SOBRECOSTO (CPI = 0.67, 2 panes quemados)
+3. Si no mejoramos, el proyecto costara $15 en vez de $10
+4. Para recuperarnos, necesitariamos eficiencia de 150% (TCPI = 1.5)
+
+PREGUNTAS DE REFLEXION:
+------------------------
+1. Si contratamos un segundo panadero, como cambiaria el SPI?
+2. Si mejoramos el horno para no quemar panes, como cambiaria el CPI?
+3. Es realista alcanzar un TCPI de 1.5? Que acciones tomarias?
+4. Conviene re-planificar (nuevo EAC) o intentar recuperar el plan?
+
+============================================================
