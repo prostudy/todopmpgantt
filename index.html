@@ -125,8 +125,10 @@
                 </td>
                 <td>
                   <input type="number" :value="task.plannedCost" min="0" step="100"
+                         :key="'pc-' + task.id + '-' + task.plannedCost"
                          @change="onTaskFieldChange(task, 'plannedCost', $event.target.value)"
-                         :disabled="task.isSummary">
+                         :disabled="task.isSummary || task.resourceAssignments.length > 0"
+                         :title="task.resourceAssignments.length > 0 ? 'Calculado desde recursos' : 'Ingrese costo manual'">
                 </td>
                 <td>
                   <input type="number" :value="task.actualCost" min="0" step="100"

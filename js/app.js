@@ -87,9 +87,7 @@ const app = createApp({
         if (task.isSummary) continue;
         if (task.resourceAssignments.length === 0) continue;
         const cost = ResourceEngine.calculateTaskResourceCost(task, project);
-        if (cost > 0) {
-          task.plannedCost = Math.round(cost * 100) / 100;
-        }
+        task.plannedCost = Math.round(cost * 100) / 100;
       }
     }
 
