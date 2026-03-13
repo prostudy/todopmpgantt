@@ -1,0 +1,8 @@
+WBS,Nombre,Duracion (dias),Predecesores,Recursos,Costo Planificado,Costo Real,% Completado,Hito,Nivel,Notas
+0,Inicio,0,,,0,0,0,Si,0,Hito de inicio
+1,Actividad 1,15,1,Recurso 1[100%],150,0,0,No,0,3 semanas. Recurso 1: 15 dias x $10/dia = $150
+2,Actividad 2,15,2,Recurso 2[100%],300,0,0,No,0,3 semanas. Recurso 2: 15 dias x $20/dia = $300
+3,Actividad 3,30,2,Recurso 1[100%],300,0,0,No,0,6 semanas. Recurso 1: 30 dias x $10/dia = $300
+4,Actividad 4,40,3,Recurso 2[100%],800,0,0,No,0,8 semanas. Recurso 2: 40 dias x $20/dia = $800
+5,Actividad 5,20,"4,5",Recurso 1[50%]; Recurso 2[50%],300,0,0,No,0,"4 semanas. Rec1: $100 + Rec2: $200 = $300"
+6,Fin,0,6,,0,0,0,Si,0,Hito de fin
