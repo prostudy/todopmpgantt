@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PMI Gantt Tool - Gestion de Proyectos</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app">
+  <!-- ===== TOOLBAR ===== -->
+  <div class="toolbar">
+    <span class="app-title">PMI Gantt Tool</span>
+    <input class="project-name-input" v-model="project.name" placeholder="Nombre del proyecto">
+    <div class="toolbar-separator"></div>
+
+    <button class="btn btn-toolbar" @click="newProject">Nuevo</button>
+    <button class="btn btn-toolbar" @click="loadDemo">Demo</button>
+    <div class="toolbar-separator"></div>
+
+    <label class="btn btn-toolbar" style="cursor:pointer">
+      Importar CSV/JSON
+      <input type="file" class="file-input" accept=".csv,.json" @change="importCSV">
+    </label>
+
+    <button class="btn btn-toolbar" @click="exportTasksCSV">Exportar Tareas CSV</button>
+    <button class="btn btn-toolbar" @click="exportProjectJSON">Guardar JSON</button>
+    <div class="toolbar-separator"></div>
+
+    <button class="btn btn-toolbar" @click="recalculate">Recalcular</button>
+    <button class="btn btn-toolbar" @click="showConfigModal = true">Config</button>
+
+    <div style="flex:1"></div>
+
+    <span style="font-size:11px;opacity:0.6">
+      Fecha Estado:
+      <input type="date" v-model="project.statusDate" @change="recalculate"
+             style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;padding:2px 6px;border-radius:3px;font-size:11px">
+    </span>
+  </div>
+
+  <!-- ===== TABS ===== -->
+  <div class="tabs-container">
+    <button class="tab-btn" :class="{active: activeTab === 'tasks'}" @click="activeTab = 'tasks'">WBS / Tareas</button>
+    <button class="tab-btn" :class="{active: activeTab === 'gantt'}" @click="activeTab = 'gantt'">Gantt</button>
+    <button class="tab-btn" :class="{active: activeTab === 'resources'}" @click="activeTab = 'resources'">Recursos</button>
+    <button class="tab-btn" :class="{active: activeTab === 'evm'}" @click="activeTab = 'evm'">EVM Dashboard</button>
+    <button class="tab-btn" :class="{active: activeTab === 'baselines'}" @click="activeTab = 'baselines'">Linea Base</button>
+  </div>
+
+  <!-- ===== CONTENT ===== -->
+  <div class="content">
+
+    <!-- ---- TAB: TASKS / WBS ---- -->
+    <div v-if="activeTab === 'tasks'">
+      <div class="card">
+        <div class="card-header">
+          <h3>Estructura de Desglose del Trabajo (WBS)</h3>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" @click="addTask()">+ Tarea</button>
+            <button class="btn btn-warning btn-sm" @click="addMilestone()">+ Hito</button>
+          </div>
+        </div>
+
+        <div class="task-table-wrapper">
+          <table class="task-table">
+            <thead>
+              <tr>
+                <th style="width:30px">#</th>
+                <th style="width:55px">WBS</th>
+                <th style="min-width:200px">Nombre de la Tarea</th>
+                <th style="width:55px">Dur.</th>
+                <th style="width:100px">Inicio</th>
+                <th style="width:100px">Fin</th>
+                <th style="width:100px">Predecesores</th>
+                <th style="width:100px">Recursos</th>
+                <th style="width:80px">Costo Plan</th>
+                <th style="width:80px">Costo Real</th>
+                <th style="width:50px">%</th>
+                <th style="width:40px">HT</th>
+                <th style="width:40px">HL</th>
+                <th style="width:35px">RC</th>
+                <th style="width:120px">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="task in orderedTasks" :key="task.id"
+                  :class="{critical: task.isCritical && !task.isSummary, summary: task.isSummary}">
+                <td>{{ getTaskRowNumber(task) }}</td>
+                <td><span class="wbs-code">{{ task.wbsCode }}</span></td>
+                <td>
+                  <div class="task-name-cell">
+                    <span v-for="n in task.level" :key="n" class="indent-spacer"></span>
+                    <button v-if="task.isSummary" class="toggle-btn" @click="toggleCollapse(task.id)">
+                      {{ task.collapsed ? '+' : '-' }}
+                    </button>
+                    <span v-if="task.isMilestone" style="color:#e67e22;margin-right:2px">&#9670;</span>
+                    <input :value="task.name" @change="onTaskFieldChange(task, 'name', $event.target.value)"
+                           :style="{fontWeight: task.isSummary ? 'bold' : 'normal'}"
+                           style="min-width:150px">
+                  </div>
+                </td>
+                <td>
+                  <input type="number" :value="task.duration" min="0"
+                         @change="onTaskFieldChange(task, 'duration', $event.target.value)"
+                         :disabled="task.isSummary">
+                </td>
+                <td style="font-size:11px">{{ task.startDate || '-' }}</td>
+                <td style="font-size:11px">{{ task.endDate || '-' }}</td>
+                <td>
+                  <input :value="getPredecessorString(task)"
+                         @change="onTaskFieldChange(task, 'predecessors', $event.target.value)"
+                         placeholder="ej: 1,2FS+1"
+                         :disabled="task.isSummary"
+                         title="Formato: #Fila[Tipo][+/-Lag]. Tipos: FS (Fin-Inicio), SS (Inicio-Inicio), FF (Fin-Fin), SF (Inicio-Fin). Ej: 3FS+2 = despues de tarea 3 con 2 dias de lag. Separar con coma: 2,5SS"
+                         style="width:110px;font-size:11px">
+                </td>
+                <td>
+                  <span style="font-size:11px;cursor:pointer;color:var(--accent)"
+                        @click="openAssignResources(task)"
+                        :title="getResourceNames(task) || 'Clic para asignar'">
+                    {{ getResourceNames(task) || '...' }}
+                  </span>
+                </td>
+                <td>
+                  <input type="number" :value="task.plannedCost" min="0" step="100"
+                         @change="onTaskFieldChange(task, 'plannedCost', $event.target.value)"
+                         :disabled="task.isSummary">
+                </td>
+                <td>
+                  <input type="number" :value="task.actualCost" min="0" step="100"
+                         @change="onTaskFieldChange(task, 'actualCost', $event.target.value)"
+                         :disabled="task.isSummary">
+                </td>
+                <td>
+                  <input type="number" :value="task.percentComplete" min="0" max="100"
+                         @change="onTaskFieldChange(task, 'percentComplete', $event.target.value)"
+                         :disabled="task.isSummary" style="width:45px">
+                </td>
+                <td>
+                  <span class="float-value" :class="{critical: task.totalFloat === 0 && !task.isSummary}">
+                    {{ task.totalFloat != null ? task.totalFloat : '-' }}
+                  </span>
+                </td>
+                <td>
+                  <span class="float-value">{{ task.freeFloat != null ? task.freeFloat : '-' }}</span>
+                </td>
+                <td>
+                  <span v-if="task.isCritical && !task.isSummary"
+                        style="color:var(--danger);font-weight:bold">Si</span>
+                  <span v-else style="color:#ccc">-</span>
+                </td>
+                <td>
+                  <div style="display:flex;gap:2px">
+                    <button class="btn btn-sm" @click="addTask(task.id)" title="Agregar sub-tarea"
+                            style="background:#eee;font-size:10px">+Sub</button>
+                    <button class="btn btn-sm" @click="indentTask(task.id)" title="Indentar">&#8594;</button>
+                    <button class="btn btn-sm" @click="outdentTask(task.id)" title="Des-indentar">&#8592;</button>
+                    <button class="btn btn-sm" @click="moveTaskUp(task.id)" title="Subir">&#8593;</button>
+                    <button class="btn btn-sm" @click="moveTaskDown(task.id)" title="Bajar">&#8595;</button>
+                    <button class="btn btn-danger btn-sm" @click="deleteTask(task.id)" title="Eliminar">X</button>
+                  </div>
+                </td>
+              </tr>
+              <tr v-if="orderedTasks.length === 0">
+                <td colspan="15" style="text-align:center;padding:20px;color:#999">
+                  No hay tareas. Agregue una tarea o cargue el proyecto demo.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- TAB: GANTT ---- -->
+    <div v-if="activeTab === 'gantt'" class="gantt-container">
+      <div class="gantt-toolbar">
+        <span style="font-weight:600;font-size:13px">Diagrama de Gantt</span>
+        <select v-model="ganttScale" class="scale-select">
+          <option value="day">Dias</option>
+          <option value="week">Semanas</option>
+          <option value="month">Meses</option>
+        </select>
+        <button class="btn btn-primary btn-sm" @click="updateGantt">Actualizar</button>
+        <button class="btn btn-success btn-sm" @click="exportGanttImage">Exportar PNG</button>
+        <div style="flex:1"></div>
+        <span style="font-size:11px;color:var(--text-light)">
+          Tareas: {{ project.tasks.filter(t => !t.isSummary).length }} |
+          Ruta Critica: {{ criticalTasks.length }} tareas
+        </span>
+      </div>
+      <div class="gantt-scroll" id="gantt-chart" v-html="ganttSvg"></div>
+    </div>
+
+    <!-- ---- TAB: RESOURCES ---- -->
+    <div v-if="activeTab === 'resources'">
+      <div class="card">
+        <div class="card-header">
+          <h3>Gestion de Recursos</h3>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-primary btn-sm" @click="addResource">+ Recurso</button>
+            <label class="btn btn-toolbar btn-sm" style="cursor:pointer;background:var(--primary-light);color:white">
+              Importar Recursos CSV
+              <input type="file" class="file-input" accept=".csv" @change="importResourcesCSV">
+            </label>
+            <button class="btn btn-sm" style="background:#eee" @click="exportResourcesCSV">Exportar CSV</button>
+            <button class="btn btn-warning btn-sm" @click="levelResources" v-if="overallocations.length > 0">
+              Nivelar Recursos ({{ overallocations.length }} conflictos)
+            </button>
+          </div>
+        </div>
+
+        <div class="resource-list">
+          <div class="resource-card" v-for="res in project.resources" :key="res.id">
+            <h4>{{ res.name }}</h4>
+            <div class="resource-form">
+              <label>Tipo</label>
+              <span>{{ res.type === 'work' ? 'Trabajo' : 'Material' }}</span>
+              <label>Costo/Hora</label>
+              <span>${{ res.costPerHour }}</span>
+              <label>Disponibilidad Maxima</label>
+              <span>{{ res.maxUnits }}%</span>
+            </div>
+            <div style="margin-top:8px;display:flex;gap:4px">
+              <button class="btn btn-primary btn-sm" @click="editResource(res)">Editar</button>
+              <button class="btn btn-danger btn-sm" @click="deleteResource(res.id)">Eliminar</button>
+            </div>
+          </div>
+          <div v-if="project.resources.length === 0"
+               style="grid-column:1/-1;text-align:center;padding:20px;color:#999">
+            No hay recursos. Agregue recursos para asignarlos a las tareas.
+          </div>
+        </div>
+      </div>
+
+      <!-- Overallocation warnings -->
+      <div class="card" v-if="overallocations.length > 0" style="border-left:4px solid var(--danger)">
+        <div class="card-header">
+          <h3 style="color:var(--danger)">Sobreasignaciones Detectadas</h3>
+        </div>
+        <table class="task-table" style="font-size:12px">
+          <thead>
+            <tr>
+              <th>Recurso</th>
+              <th>Fecha</th>
+              <th>Carga</th>
+              <th>Maximo</th>
+              <th>Tareas</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(oa, idx) in overallocations.slice(0, 20)" :key="idx">
+              <td>{{ oa.resourceName }}</td>
+              <td>{{ oa.date }}</td>
+              <td style="color:var(--danger);font-weight:bold">{{ oa.load }}%</td>
+              <td>{{ oa.maxUnits }}%</td>
+              <td>{{ oa.tasks.join(', ') }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-if="overallocations.length > 20" style="font-size:11px;color:#999;margin-top:8px">
+          ...y {{ overallocations.length - 20 }} mas
+        </p>
+      </div>
+
+      <!-- Resource Histogram -->
+      <div class="card" v-if="histogramData.datasets.length > 0">
+        <div class="card-header">
+          <h3>Histograma de Recursos</h3>
+        </div>
+        <div v-for="ds in histogramData.datasets" :key="ds.resourceId" class="histogram-container">
+          <h4 style="font-size:13px;margin-bottom:8px">{{ ds.resourceName }} (Max: {{ ds.maxUnits }}%)</h4>
+          <div class="histogram-bar-group">
+            <div v-for="(val, idx) in ds.data" :key="idx"
+                 class="histogram-bar"
+                 :class="{overallocated: val > ds.maxUnits}"
+                 :style="{height: Math.max(val / 2, 2) + 'px'}"
+                 :title="histogramData.labels[idx] + ': ' + val + '%'">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- TAB: EVM DASHBOARD ---- -->
+    <div v-if="activeTab === 'evm'">
+      <div class="card" v-if="evmMetrics">
+        <div class="card-header">
+          <h3>Analisis de Valor Ganado (EVM)</h3>
+          <button class="btn btn-sm" style="background:#eee" @click="exportEVMCSV">Exportar CSV</button>
+        </div>
+
+        <div class="evm-grid">
+          <div class="evm-card status-gray">
+            <div class="metric-label">BAC</div>
+            <div class="metric-value">${{ evmMetrics.BAC.toLocaleString() }}</div>
+            <div class="metric-desc">Presupuesto Total</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
+            <div class="metric-label">PV</div>
+            <div class="metric-value">${{ evmMetrics.PV.toLocaleString() }}</div>
+            <div class="metric-desc">Valor Planificado</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
+            <div class="metric-label">EV</div>
+            <div class="metric-value">${{ evmMetrics.EV.toLocaleString() }}</div>
+            <div class="metric-desc">Valor Ganado</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CPI, 'CPI')">
+            <div class="metric-label">AC</div>
+            <div class="metric-value">${{ evmMetrics.AC.toLocaleString() }}</div>
+            <div class="metric-desc">Costo Real</div>
+          </div>
+
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SV, 'SV')">
+            <div class="metric-label">SV</div>
+            <div class="metric-value">${{ evmMetrics.SV.toLocaleString() }}</div>
+            <div class="metric-desc">Varianza Cronograma</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CV, 'CV')">
+            <div class="metric-label">CV</div>
+            <div class="metric-value">${{ evmMetrics.CV.toLocaleString() }}</div>
+            <div class="metric-desc">Varianza Costo</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
+            <div class="metric-label">SPI</div>
+            <div class="metric-value">{{ evmMetrics.SPI }}</div>
+            <div class="metric-desc">Indice Cronograma</div>
+          </div>
+          <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CPI, 'CPI')">
+            <div class="metric-label">CPI</div>
+            <div class="metric-value">{{ evmMetrics.CPI }}</div>
+            <div class="metric-desc">Indice Costo</div>
+          </div>
+
+          <div class="evm-card status-gray">
+            <div class="metric-label">EAC</div>
+            <div class="metric-value">${{ evmMetrics.EAC.toLocaleString() }}</div>
+            <div class="metric-desc">Estimado Conclusion</div>
+          </div>
+          <div class="evm-card status-gray">
+            <div class="metric-label">ETC</div>
+            <div class="metric-value">${{ evmMetrics.ETC.toLocaleString() }}</div>
+            <div class="metric-desc">Estimado para Completar</div>
+          </div>
+          <div class="evm-card status-gray">
+            <div class="metric-label">VAC</div>
+            <div class="metric-value">${{ evmMetrics.VAC.toLocaleString() }}</div>
+            <div class="metric-desc">Varianza Conclusion</div>
+          </div>
+          <div class="evm-card status-gray">
+            <div class="metric-label">TCPI</div>
+            <div class="metric-value">{{ evmMetrics.TCPI_BAC }}</div>
+            <div class="metric-desc">Indice Para Completar</div>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div style="margin:16px 0">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span>Avance del Proyecto: {{ evmMetrics.percentComplete }}%</span>
+            <span>Gastado: {{ evmMetrics.percentSpent }}% del BAC</span>
+          </div>
+          <div style="background:#ecf0f1;border-radius:8px;height:20px;overflow:hidden;position:relative">
+            <div :style="{width: Math.min(evmMetrics.percentComplete, 100) + '%', height: '100%', background: 'var(--success)', borderRadius: '8px', transition: 'width 0.5s'}"></div>
+            <div :style="{position:'absolute', top:0, left:0, width: Math.min(evmMetrics.percentSpent, 100) + '%', height: '100%', background: 'var(--danger)', borderRadius: '8px', opacity: 0.3}"></div>
+          </div>
+        </div>
+
+        <!-- Interpretations -->
+        <div class="evm-interpretations" v-if="evmInterpretations.length > 0">
+          <h4 style="font-size:13px;margin-bottom:6px">Interpretacion:</h4>
+          <ul>
+            <li v-for="(interp, idx) in evmInterpretations" :key="idx">{{ interp }}</li>
+          </ul>
+        </div>
+
+        <!-- S-Curve -->
+        <div class="scurve-container" v-if="scurveSvg">
+          <h4 style="font-size:13px;margin-bottom:8px">Curva S</h4>
+          <div class="scurve-legend">
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:#3498db"></span> PV (Valor Planificado)
+            </div>
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:#27ae60"></span> EV (Valor Ganado)
+            </div>
+            <div class="legend-item">
+              <span class="legend-swatch" style="background:#e74c3c"></span> AC (Costo Real)
+            </div>
+          </div>
+          <div v-html="scurveSvg"></div>
+        </div>
+      </div>
+
+      <div v-else class="card" style="text-align:center;padding:40px;color:#999">
+        <p>No hay datos para el analisis EVM.</p>
+        <p>Agregue tareas con costos y porcentajes de avance, luego recalcule.</p>
+      </div>
+    </div>
+
+    <!-- ---- TAB: BASELINES ---- -->
+    <div v-if="activeTab === 'baselines'">
+      <div class="card">
+        <div class="card-header">
+          <h3>Gestion de Lineas Base</h3>
+          <button class="btn btn-primary btn-sm" @click="saveBaseline">Guardar Linea Base</button>
+        </div>
+
+        <div class="baseline-list">
+          <div class="baseline-item" v-for="(bl, idx) in project.baselines" :key="bl.id">
+            <div class="bl-info">
+              <h4>{{ bl.name }} <span v-if="idx === 0" style="color:var(--success);font-size:11px">(ACTIVA)</span></h4>
+              <span>Creada: {{ new Date(bl.createdAt).toLocaleString('es-MX') }} |
+                    Tareas: {{ bl.tasks.length }} |
+                    Presupuesto: ${{ bl.totalBudget.toLocaleString() }}</span>
+            </div>
+            <div style="display:flex;gap:4px">
+              <button v-if="idx !== 0" class="btn btn-primary btn-sm" @click="setActiveBaseline(bl.id)">Activar</button>
+              <button class="btn btn-danger btn-sm" @click="deleteBaseline(bl.id)">Eliminar</button>
+            </div>
+          </div>
+          <div v-if="project.baselines.length === 0" style="text-align:center;padding:20px;color:#999">
+            No hay lineas base. Guarde una linea base para comparar el progreso del proyecto.
+          </div>
+        </div>
+      </div>
+
+      <div class="card" v-if="project.baselines.length > 0">
+        <div class="card-header">
+          <h3>Comparacion con Linea Base Activa</h3>
+        </div>
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th>Tarea</th>
+              <th>Inicio Plan</th>
+              <th>Inicio Base</th>
+              <th>Fin Plan</th>
+              <th>Fin Base</th>
+              <th>Variacion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="task in project.tasks.filter(t => !t.isSummary)" :key="task.id">
+              <td>{{ task.name }}</td>
+              <td>{{ task.startDate || '-' }}</td>
+              <td>
+                {{ project.baselines[0].tasks.find(bt => bt.id === task.id)?.startDate || '-' }}
+              </td>
+              <td>{{ task.endDate || '-' }}</td>
+              <td>
+                {{ project.baselines[0].tasks.find(bt => bt.id === task.id)?.endDate || '-' }}
+              </td>
+              <td>
+                <span v-if="task.endDate && project.baselines[0].tasks.find(bt => bt.id === task.id)?.endDate"
+                      :style="{color: new Date(task.endDate) > new Date(project.baselines[0].tasks.find(bt => bt.id === task.id).endDate) ? 'var(--danger)' : 'var(--success)'}">
+                  {{ Math.round((new Date(task.endDate) - new Date(project.baselines[0].tasks.find(bt => bt.id === task.id).endDate)) / (1000*60*60*24)) }} dias
+                </span>
+                <span v-else>-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div class="status-bar">
+    <div class="status-item">
+      <span class="status-indicator" :class="criticalTasks.length > 0 ? 'red' : 'green'"></span>
+      Tareas: {{ project.tasks.filter(t => !t.isSummary).length }} |
+      Criticas: {{ criticalTasks.length }} |
+      Recursos: {{ project.resources.length }}
+    </div>
+    <div class="status-item">
+      Presupuesto: ${{ totalBudget.toLocaleString() }} |
+      Gastado: ${{ totalActualCost.toLocaleString() }}
+    </div>
+    <div class="status-item">
+      Inicio: {{ project.startDate }}
+    </div>
+  </div>
+
+  <!-- ===== MODALS ===== -->
+
+  <!-- Config Modal -->
+  <div class="modal-overlay" v-if="showConfigModal" @click.self="showConfigModal = false">
+    <div class="modal">
+      <h3>Configuracion del Proyecto</h3>
+      <div class="config-grid">
+        <div>
+          <label>Fecha de Inicio del Proyecto</label>
+          <input type="date" v-model="project.startDate">
+        </div>
+        <div>
+          <label>Fecha de Estado (EVM)</label>
+          <input type="date" v-model="project.statusDate">
+        </div>
+        <div>
+          <label>Horas por Dia</label>
+          <input type="number" v-model.number="project.hoursPerDay" min="1" max="24">
+        </div>
+        <div>
+          <label>Dias Laborales</label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px">
+            <label v-for="(day, idx) in ['Dom','Lun','Mar','Mie','Jue','Vie','Sab']" :key="idx"
+                   style="font-size:11px;display:flex;align-items:center;gap:2px">
+              <input type="checkbox" :value="idx"
+                     :checked="project.calendarWorkdays.includes(idx)"
+                     @change="project.calendarWorkdays.includes(idx) ? project.calendarWorkdays.splice(project.calendarWorkdays.indexOf(idx), 1) : project.calendarWorkdays.push(idx)">
+              {{ day }}
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" @click="showConfigModal = false; recalculate()">Guardar y Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resource Modal -->
+  <div class="modal-overlay" v-if="showResourceModal" @click.self="showResourceModal = false">
+    <div class="modal">
+      <h3>{{ editingResource && project.resources.find(r => r.id === editingResource.id) ? 'Editar' : 'Nuevo' }} Recurso</h3>
+      <div v-if="editingResource">
+        <div class="form-group">
+          <label>Nombre</label>
+          <input v-model="editingResource.name">
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select v-model="editingResource.type">
+            <option value="work">Trabajo</option>
+            <option value="material">Material</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Costo por Hora ($)</label>
+          <input type="number" v-model.number="editingResource.costPerHour" min="0" step="50">
+        </div>
+        <div class="form-group">
+          <label>Disponibilidad Maxima (%)</label>
+          <input type="number" v-model.number="editingResource.maxUnits" min="0" max="300">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" @click="showResourceModal = false">Cancelar</button>
+        <button class="btn btn-primary" @click="saveResource">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign Resources Modal -->
+  <div class="modal-overlay" v-if="showAssignModal" @click.self="showAssignModal = false">
+    <div class="modal">
+      <h3>Asignar Recursos a: {{ assigningTask?.name }}</h3>
+      <div v-if="project.resources.length === 0" style="text-align:center;padding:16px;color:#999">
+        No hay recursos disponibles. Cree recursos primero.
+      </div>
+      <div v-else>
+        <div v-for="res in project.resources" :key="res.id"
+             style="display:flex;align-items:center;gap:8px;padding:8px;border-bottom:1px solid var(--border)">
+          <input type="checkbox"
+                 :checked="isResourceAssigned(assigningTask, res.id)"
+                 @change="toggleResourceAssignment(assigningTask, res.id)">
+          <span style="flex:1">{{ res.name }} ({{ res.type === 'work' ? 'Trabajo' : 'Material' }})</span>
+          <label style="font-size:11px">Unidades %</label>
+          <input type="number" style="width:60px"
+                 :value="getAssignmentUnits(assigningTask, res.id)"
+                 @change="updateAssignmentUnits(assigningTask, res.id, $event.target.value)"
+                 :disabled="!isResourceAssigned(assigningTask, res.id)"
+                 min="0" max="300">
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" @click="showAssignModal = false">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div class="toast-container">
+    <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.message }}</div>
+  </div>
+</div>
+
+<!-- ===== SCRIPTS ===== -->
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="js/data-model.js"></script>
+<script src="js/schedule-engine.js"></script>
+<script src="js/evm-engine.js"></script>
+<script src="js/resource-engine.js"></script>
+<script src="js/csv-manager.js"></script>
+<script src="js/gantt-renderer.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
