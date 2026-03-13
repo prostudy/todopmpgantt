@@ -247,4 +247,146 @@ TestRunner.registerSuite('Schedule Engine - CPM', [
       assert.falsy(sorted, 'Debe retornar null cuando hay ciclos');
     },
   },
+
+  // ======= TESTS NUEVOS =======
+
+  {
+    name: 'getWorkdaysBetween - debe contar dias laborables correctamente',
+    fn: () => {
+      const start = new Date('2026-01-05T00:00:00'); // lunes
+      const end = new Date('2026-01-09T00:00:00');   // viernes
+      const result = ScheduleEngine.getWorkdaysBetween(start, end, [1, 2, 3, 4, 5]);
+      assert.equal(result, 4, 'Lun a Vie = 4 dias laborables (no incluye inicio)');
+    },
+  },
+
+  {
+    name: 'getWorkdaysBetween - debe saltar fines de semana en el conteo',
+    fn: () => {
+      const start = new Date('2026-01-05T00:00:00'); // lunes
+      const end = new Date('2026-01-12T00:00:00');   // lunes siguiente
+      const result = ScheduleEngine.getWorkdaysBetween(start, end, [1, 2, 3, 4, 5]);
+      assert.equal(result, 5, 'Lun a lunes sig = 5 dias laborables');
+    },
+  },
+
+  {
+    name: 'getWorkdaysBetween - debe retornar 0 si misma fecha',
+    fn: () => {
+      const date = new Date('2026-01-05T00:00:00');
+      const result = ScheduleEngine.getWorkdaysBetween(date, date, [1, 2, 3, 4, 5]);
+      assert.equal(result, 0);
+    },
+  },
+
+  {
+    name: 'calculateSummaryTasks - debe calcular costo resumen desde hijos',
+    fn: () => {
+      const parent = DataModel.createTask({ id: 'p1', isSummary: true, parentId: null });
+      const c1 = DataModel.createTask({ id: 'c1', parentId: 'p1', duration: 5, plannedCost: 100, actualCost: 80, percentComplete: 60 });
+      const c2 = DataModel.createTask({ id: 'c2', parentId: 'p1', duration: 5, plannedCost: 200, actualCost: 150, percentComplete: 40 });
+      const tasks = [parent, c1, c2];
+      ScheduleEngine.calculateSummaryTasks(tasks);
+      assert.equal(parent.plannedCost, 300, 'Costo plan = 100 + 200');
+      assert.equal(parent.actualCost, 230, 'Costo real = 80 + 150');
+    },
+  },
+
+  {
+    name: 'calculateSummaryTasks - debe calcular porcentaje ponderado por duracion',
+    fn: () => {
+      const parent = DataModel.createTask({ id: 'p1', isSummary: true, parentId: null });
+      const c1 = DataModel.createTask({ id: 'c1', parentId: 'p1', duration: 10, percentComplete: 100 });
+      const c2 = DataModel.createTask({ id: 'c2', parentId: 'p1', duration: 10, percentComplete: 0 });
+      const tasks = [parent, c1, c2];
+      ScheduleEngine.calculateSummaryTasks(tasks);
+      assert.equal(parent.percentComplete, 50, '(100*10 + 0*10) / 20 = 50%');
+    },
+  },
+
+  {
+    name: 'forwardPass - debe calcular ES/EF con lag negativo (lead)',
+    fn: () => {
+      const t1 = DataModel.createTask({ id: 't1', duration: 10, predecessors: [] });
+      const t2 = DataModel.createTask({ id: 't2', duration: 5, predecessors: [{ taskId: 't1', type: 'FS', lag: -3 }] });
+      const project = {
+        tasks: [t1, t2],
+        startDate: '2026-01-01',
+        calendarWorkdays: [1, 2, 3, 4, 5],
+      };
+      ScheduleEngine.calculate(project);
+      assert.equal(t2.earlyStart, 7, 'FS con lag -3: ES = EF(10) - 3 = 7');
+      assert.equal(t2.earlyFinish, 12);
+    },
+  },
+
+  {
+    name: 'calculateDates - hito debe tener startDate igual a endDate',
+    fn: () => {
+      const t1 = DataModel.createTask({ id: 't1', duration: 5, predecessors: [] });
+      const milestone = DataModel.createTask({ id: 'm1', duration: 0, predecessors: [{ taskId: 't1', type: 'FS', lag: 0 }] });
+      const project = {
+        tasks: [t1, milestone],
+        startDate: '2026-01-05',
+        calendarWorkdays: [1, 2, 3, 4, 5],
+      };
+      ScheduleEngine.calculate(project);
+      assert.equal(milestone.startDate, milestone.endDate, 'Hito: startDate = endDate');
+    },
+  },
+
+  {
+    name: 'calculate - proyecto con tarea unica sin dependencias',
+    fn: () => {
+      const t1 = DataModel.createTask({ id: 't1', duration: 3, predecessors: [] });
+      const project = {
+        tasks: [t1],
+        startDate: '2026-01-05',
+        calendarWorkdays: [1, 2, 3, 4, 5],
+      };
+      ScheduleEngine.calculate(project);
+      assert.equal(t1.earlyStart, 0);
+      assert.equal(t1.earlyFinish, 3);
+      assert.equal(t1.totalFloat, 0, 'Tarea unica es critica');
+      assert.truthy(t1.isCritical);
+    },
+  },
+
+  {
+    name: 'parsePredecessorString - debe retornar array vacio para string vacio',
+    fn: () => {
+      const tasks = [DataModel.createTask({ id: 't1' })];
+      assert.arrayLength(ScheduleEngine.parsePredecessorString('', tasks), 0);
+      assert.arrayLength(ScheduleEngine.parsePredecessorString(null, tasks), 0);
+      assert.arrayLength(ScheduleEngine.parsePredecessorString('  ', tasks), 0);
+    },
+  },
+
+  {
+    name: 'parsePredecessorString - debe ignorar referencias invalidas',
+    fn: () => {
+      const tasks = [DataModel.createTask({ id: 't1' }), DataModel.createTask({ id: 't2' })];
+      const result = ScheduleEngine.parsePredecessorString('1,99,2', tasks);
+      assert.arrayLength(result, 2, 'Fila 99 no existe, debe ignorarse');
+    },
+  },
+
+  {
+    name: 'forwardPass - multiples predecesores toman el maximo ES',
+    fn: () => {
+      const t1 = DataModel.createTask({ id: 't1', duration: 10, predecessors: [] });
+      const t2 = DataModel.createTask({ id: 't2', duration: 3, predecessors: [] });
+      const t3 = DataModel.createTask({ id: 't3', duration: 5, predecessors: [
+        { taskId: 't1', type: 'FS', lag: 0 },
+        { taskId: 't2', type: 'FS', lag: 0 },
+      ]});
+      const project = {
+        tasks: [t1, t2, t3],
+        startDate: '2026-01-01',
+        calendarWorkdays: [1, 2, 3, 4, 5],
+      };
+      ScheduleEngine.calculate(project);
+      assert.equal(t3.earlyStart, 10, 'ES = max(EF_t1=10, EF_t2=3) = 10');
+    },
+  },
 ]);

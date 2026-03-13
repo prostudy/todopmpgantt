@@ -269,4 +269,120 @@ TestRunner.registerSuite('EVM Engine', [
       assert.arrayContains(interpretations, 'El proyecto esta por encima del presupuesto');
     },
   },
+
+  // ======= TESTS NUEVOS =======
+
+  {
+    name: 'calculate - proyecto con BAC = 0 no debe generar NaN/Infinity',
+    fn: () => {
+      const project = {
+        tasks: [
+          DataModel.createTask({ id: 't1', plannedCost: 0, actualCost: 0, percentComplete: 0, isSummary: false }),
+        ],
+        baselines: [],
+        statusDate: '2026-01-15',
+      };
+      const metrics = EVMEngine.calculate(project);
+      assert.equal(metrics.BAC, 0);
+      assert.equal(metrics.SPI, 0, 'SPI debe ser 0 cuando PV es 0');
+      assert.equal(metrics.CPI, 0, 'CPI debe ser 0 cuando AC es 0');
+      assert.truthy(!isNaN(metrics.EAC), 'EAC no debe ser NaN');
+      assert.truthy(isFinite(metrics.EAC), 'EAC no debe ser Infinity');
+    },
+  },
+
+  {
+    name: 'calculate - todas las tareas al 100% deben dar EV = BAC',
+    fn: () => {
+      const project = {
+        tasks: [
+          DataModel.createTask({ id: 't1', plannedCost: 500, actualCost: 500, percentComplete: 100, isSummary: false }),
+          DataModel.createTask({ id: 't2', plannedCost: 500, actualCost: 400, percentComplete: 100, isSummary: false }),
+        ],
+        baselines: [],
+        statusDate: '2026-01-15',
+      };
+      const metrics = EVMEngine.calculate(project);
+      assert.equal(metrics.BAC, 1000);
+      assert.equal(metrics.EV, 1000, 'EV debe igualar BAC al 100%');
+      assert.equal(metrics.percentComplete, 100);
+    },
+  },
+
+  {
+    name: 'calculate - todas las tareas al 0% deben dar EV = 0',
+    fn: () => {
+      const project = {
+        tasks: [
+          DataModel.createTask({ id: 't1', plannedCost: 1000, actualCost: 0, percentComplete: 0, isSummary: false }),
+        ],
+        baselines: [],
+        statusDate: '2026-01-15',
+      };
+      const metrics = EVMEngine.calculate(project);
+      assert.equal(metrics.EV, 0);
+      assert.equal(metrics.percentComplete, 0);
+    },
+  },
+
+  {
+    name: 'generateSCurveData - debe generar datos con labels y series',
+    fn: () => {
+      const project = {
+        tasks: [
+          DataModel.createTask({
+            id: 't1',
+            plannedCost: 1000,
+            actualCost: 500,
+            percentComplete: 50,
+            startDate: '2026-01-05',
+            endDate: '2026-01-16',
+            isSummary: false,
+          }),
+        ],
+        baselines: [],
+        statusDate: '2026-01-10',
+      };
+      const data = EVMEngine.generateSCurveData(project);
+      assert.truthy(data.labels.length > 0, 'Debe generar labels');
+      assert.truthy(data.pv.length > 0, 'Debe generar serie PV');
+      assert.truthy(data.ev.length > 0, 'Debe generar serie EV');
+      assert.truthy(data.ac.length > 0, 'Debe generar serie AC');
+      assert.equal(data.labels.length, data.pv.length, 'Labels y PV deben tener misma longitud');
+    },
+  },
+
+  {
+    name: 'generateSCurveData - proyecto vacio debe retornar arrays vacios',
+    fn: () => {
+      const project = {
+        tasks: [],
+        baselines: [],
+        statusDate: '2026-01-10',
+      };
+      const data = EVMEngine.generateSCurveData(project);
+      assert.arrayLength(data.labels, 0);
+      assert.arrayLength(data.pv, 0);
+    },
+  },
+
+  {
+    name: 'interpret - proyecto en tiempo y presupuesto',
+    fn: () => {
+      const metrics = { SPI: 1.0, CPI: 1.0, EAC: 1000, BAC: 1000 };
+      const interpretations = EVMEngine.interpret(metrics);
+      assert.arrayContains(interpretations, 'El proyecto esta en tiempo');
+      assert.arrayContains(interpretations, 'El proyecto esta en presupuesto');
+    },
+  },
+
+  {
+    name: 'interpret - proyecto atrasado y por debajo del presupuesto',
+    fn: () => {
+      const metrics = { SPI: 0.7, CPI: 1.2, EAC: 800, BAC: 1000 };
+      const interpretations = EVMEngine.interpret(metrics);
+      assert.arrayContains(interpretations, 'El proyecto esta atrasado en cronograma');
+      assert.arrayContains(interpretations, 'El proyecto esta por debajo del presupuesto');
+    },
+  },
 ]);

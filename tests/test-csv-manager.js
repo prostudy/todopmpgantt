@@ -162,4 +162,95 @@ TestRunner.registerSuite('CSV Manager', [
       assert.arrayLength(imported.tasks, 1);
     },
   },
+
+  // ======= TESTS NUEVOS =======
+
+  {
+    name: 'parseCSV - debe manejar lineas vacias',
+    fn: () => {
+      const csv = 'Name,Age\nJohn,30\n\nJane,25\n';
+      const parsed = CSVManager.parseCSV(csv);
+      // Debe parsear sin errores (puede incluir filas vacias)
+      assert.truthy(parsed.length >= 3, 'Debe parsear al menos header + 2 filas');
+    },
+  },
+
+  {
+    name: 'parseCSV - debe manejar caracteres especiales (acentos, ñ)',
+    fn: () => {
+      const csv = 'Nombre,Descripción\nDiseño,Tarea con ñ y acentós';
+      const parsed = CSVManager.parseCSV(csv);
+      assert.equal(parsed[1][0], 'Diseño');
+      assert.truthy(parsed[1][1].includes('ñ'), 'Debe preservar ñ');
+    },
+  },
+
+  {
+    name: 'exportTasks + importTasks - round trip debe preservar datos',
+    fn: () => {
+      const project = {
+        tasks: [
+          DataModel.createTask({
+            id: 't1',
+            name: 'Analisis',
+            duration: 10,
+            plannedCost: 500,
+            wbsCode: '1',
+            isSummary: false,
+          }),
+          DataModel.createTask({
+            id: 't2',
+            name: 'Desarrollo',
+            duration: 20,
+            plannedCost: 1000,
+            wbsCode: '2',
+            isSummary: false,
+          }),
+        ],
+        resources: [],
+      };
+      const csv = CSVManager.exportTasks(project);
+      const imported = CSVManager.importTasks(csv, { resources: [] });
+      assert.arrayLength(imported.tasks, 2);
+      assert.equal(imported.tasks[0].name, 'Analisis');
+      assert.equal(imported.tasks[0].duration, 10);
+      assert.equal(imported.tasks[1].name, 'Desarrollo');
+      assert.equal(imported.tasks[1].duration, 20);
+    },
+  },
+
+  {
+    name: 'parseResourceString - string vacio debe retornar array vacio',
+    fn: () => {
+      const project = { resources: [] };
+      const assignments = CSVManager.parseResourceString('', project);
+      assert.arrayLength(assignments, 0);
+    },
+  },
+
+  {
+    name: 'parseResourceString - recurso no existente debe ignorarse',
+    fn: () => {
+      const r1 = DataModel.createResource({ id: 'r1', name: 'Developer' });
+      const project = { resources: [r1] };
+      const assignments = CSVManager.parseResourceString('Inexistente[100%]', project);
+      assert.arrayLength(assignments, 0, 'Recurso no encontrado debe ignorarse');
+    },
+  },
+
+  {
+    name: 'exportProjectJSON + importProjectJSON - round trip completo',
+    fn: () => {
+      const project = DataModel.createProject({ name: 'Round Trip Test' });
+      project.tasks.push(DataModel.createTask({ id: 't1', name: 'Tarea 1', duration: 5, plannedCost: 100 }));
+      project.resources.push(DataModel.createResource({ id: 'r1', name: 'Recurso 1', costPerHour: 50 }));
+      const json = CSVManager.exportProjectJSON(project);
+      const imported = CSVManager.importProjectJSON(json);
+      assert.equal(imported.name, 'Round Trip Test');
+      assert.arrayLength(imported.tasks, 1);
+      assert.arrayLength(imported.resources, 1);
+      assert.equal(imported.tasks[0].name, 'Tarea 1');
+      assert.equal(imported.resources[0].costPerHour, 50);
+    },
+  },
 ]);
