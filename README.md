@@ -70,22 +70,75 @@ Herramienta web gratuita de gestion de proyectos con diagrama de Gantt, ruta cri
 
 ## Inicio Rapido
 
-### Opcion 1: Abrir directamente
-1. Descarga o clona el repositorio
-2. Abre `https://todopmp.com/gantt` en tu navegador (Chrome, Firefox, Edge, Safari)
-3. Listo - no necesitas servidor
+### Opcion 1: Sin servidor (solo Gantt, sin IA)
+1. Clona el repositorio
+   ```bash
+   git clone git@github.com:prostudy/todopmpgantt.git
+   cd todopmpgantt
+   ```
+2. Abre `index.html` directamente en tu navegador — no necesitas servidor
 
-### Opcion 2: Servidor local (opcional)
+### Opcion 2: Servidor local con PHP (Gantt + Analisis IA)
+
+La funcion **Analizar con IA** requiere PHP en el servidor para llamar a la API de OpenAI.
+
+#### Con MAMP (macOS/Windows)
+1. Copia la carpeta `gantt-pmi` dentro de `Applications/MAMP/htdocs/`
+2. Inicia MAMP y activa los servidores
+3. Abre `http://localhost:8888/gantt-pmi/`
+
+#### Con PHP integrado (cualquier sistema)
 ```bash
 cd gantt-pmi
-python3 -m http.server 8080
+php -S localhost:8080
 ```
 Luego abre `http://localhost:8080` en tu navegador.
 
 ### Opcion 3: Demo rapido
-1. Abre `https://todopmp.com/gantt`
-2. Haz clic en el boton **Demo** en la barra de herramientas
+1. Abre la app en el navegador
+2. Clic en **Demo** en la barra de herramientas
 3. Explora el proyecto de ejemplo precargado
+
+---
+
+## Configurar Analisis con IA
+
+El boton **🤖 Analizar con IA** envia los datos del proyecto a OpenAI GPT-4o y genera un reporte ejecutivo con 9 secciones basadas en PMBOK.
+
+### 1. Crear el archivo de configuracion
+```bash
+cp backend/config.example.php backend/config.php
+```
+
+### 2. Agregar tu API key de OpenAI
+Edita `backend/config.php`:
+```php
+define('OPENAI_API_KEY', 'sk-tu-api-key-aqui');
+define('OPENAI_MODEL',   'gpt-4o');
+define('MAX_TOKENS',     8192);
+define('TEMPERATURE',    0.3);
+```
+
+> ⚠️ **`backend/config.php` esta en `.gitignore` y nunca se sube a git.** No compartas ni expongas ese archivo.
+
+### 3. Obtener una API key
+1. Ve a [platform.openai.com](https://platform.openai.com)
+2. Crea una cuenta o inicia sesion
+3. En **API Keys**, genera una nueva key
+4. Asegurate de tener credito en tu cuenta
+
+### 4. Probar el endpoint
+```bash
+curl -X POST http://localhost:8080/backend/analyze.php \
+  -H "Content-Type: application/json" \
+  -d '{"project":{"name":"Test","tasks":[]}}'
+# Respuesta esperada: {"error":"El proyecto no tiene tareas para analizar"}
+```
+
+### 5. Usar la funcion
+1. Carga un proyecto (o usa **Demo**)
+2. Clic en **🤖 Analizar con IA**
+3. El reporte aparece en tiempo real (15–30 segundos)
 
 ---
 
@@ -94,9 +147,14 @@ Luego abre `http://localhost:8080` en tu navegador.
 ```
 gantt-pmi/
 ├── index.html                  # Aplicacion principal
-├── og-image.html               # Plantilla imagen OpenGraph
+├── .gitignore                  # Excluye config.php y archivos sensibles
 ├── README.md                   # Este archivo
-├── MANUAL_USUARIO.md           # Manual de usuario completo
+│
+├── backend/                    # Servidor PHP para Analisis IA (opcional)
+│   ├── analyze.php             # Endpoint principal: CORS, streaming a OpenAI
+│   ├── config.php              # API key y constantes (NO en git, crear desde example)
+│   ├── config.example.php      # Plantilla de configuracion (esta en git)
+│   └── .htaccess               # Bloquea acceso directo a config.php
 │
 ├── css/
 │   └── styles.css              # Design system (Navy/Teal/Coral)
@@ -144,7 +202,10 @@ gantt-pmi/
 | **Fuentes** | Google Fonts (Inter + JetBrains Mono) |
 | **Persistencia** | localStorage del navegador |
 | **Exportacion** | html2canvas (PNG), Blob API (CSV/JSON) |
-| **Backend** | Ninguno - 100% client-side |
+| **Backend (IA)** | PHP 7.4+ con cURL (opcional, solo para Analisis IA) |
+| **IA** | OpenAI GPT-4o via API (streaming SSE) |
+| **Seguridad HTML** | DOMPurify 3.2 (sanitizado del HTML generado por IA) |
+| **Markdown** | marked.js 12 (renderizado de respuestas IA) |
 | **Tests** | Suite propia (94 unit tests) |
 
 ### Motores de Calculo
