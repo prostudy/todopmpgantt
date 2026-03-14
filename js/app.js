@@ -23,6 +23,9 @@ const app = createApp({
     const editingResource = ref(null);
     const showAssignModal = ref(false);
     const assigningTask = ref(null);
+    const showAIModal = ref(false);
+    const aiAnalysisHTML = ref('');
+    const aiLoading = ref(false);
 
     // ---- Computed ----
     const orderedTasks = computed(() => DataModel.getOrderedTasks(project.tasks));
@@ -107,6 +110,59 @@ const app = createApp({
 
     function checkOverallocations() {
       overallocations.value = ResourceEngine.detectOverallocation(project);
+    }
+
+    async function analyzeWithAI() {
+      if (project.tasks.length === 0) {
+        toast('El proyecto no tiene tareas para analizar', 'warning');
+        return;
+      }
+      updateEVM();
+      aiLoading.value = true;
+      aiAnalysisHTML.value = '';
+      showAIModal.value = true;
+
+      const payload = {
+        project: JSON.parse(JSON.stringify(project)), // deproxificar reactive
+        evmMetrics: evmMetrics.value,
+      };
+
+      try {
+        const response = await fetch('backend/analyze.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ error: 'Error desconocido' }));
+          toast(err.error || 'Error en el servidor de análisis IA', 'error');
+          aiLoading.value = false;
+          return;
+        }
+        // Streaming via ReadableStream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let accum = '';
+        const purifyOpts = {
+          ALLOWED_TAGS: ['h2','h3','h4','p','ul','ol','li','table','thead','tbody',
+                         'tr','th','td','strong','em','span','div','br','b','i','hr'],
+          ALLOWED_ATTR: ['style','class','colspan','rowspan'],
+        };
+        function renderContent(text) {
+          return DOMPurify.sanitize(marked.parse(text), purifyOpts);
+        }
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          accum += decoder.decode(value, { stream: true });
+          aiAnalysisHTML.value = renderContent(accum);
+        }
+      } catch (err) {
+        toast('No se pudo conectar con el backend de análisis IA', 'error');
+        showAIModal.value = false;
+      } finally {
+        aiLoading.value = false;
+      }
     }
 
     // Task CRUD
@@ -679,6 +735,7 @@ const app = createApp({
       saveBaseline, deleteBaseline, setActiveBaseline, levelResources,
       exportTasksCSV, exportResourcesCSV, exportEVMCSV, exportProjectJSON,
       importCSV, importResourcesCSV, exportGanttImage, loadDemo,
+      showAIModal, aiAnalysisHTML, aiLoading, analyzeWithAI,
       // Helpers
       EVMEngine,
     };
