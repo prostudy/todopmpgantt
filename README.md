@@ -72,7 +72,7 @@ Herramienta web gratuita de gestion de proyectos con diagrama de Gantt, ruta cri
 
 ### Opcion 1: Abrir directamente
 1. Descarga o clona el repositorio
-2. Abre `index.html` en tu navegador (Chrome, Firefox, Edge, Safari)
+2. Abre `https://todopmp.com/gantt` en tu navegador (Chrome, Firefox, Edge, Safari)
 3. Listo - no necesitas servidor
 
 ### Opcion 2: Servidor local (opcional)
@@ -83,7 +83,7 @@ python3 -m http.server 8080
 Luego abre `http://localhost:8080` en tu navegador.
 
 ### Opcion 3: Demo rapido
-1. Abre `index.html`
+1. Abre `https://todopmp.com/gantt`
 2. Haz clic en el boton **Demo** en la barra de herramientas
 3. Explora el proyecto de ejemplo precargado
 
