@@ -1,0 +1,15 @@
+# API keys y configuración sensible
+backend/config.php
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
