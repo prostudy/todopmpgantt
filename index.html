@@ -165,6 +165,18 @@
 </head>
 <body>
 
+<!-- Mobile Warning Banner -->
+<div class="mobile-warning" id="mobile-warning">
+  <div class="mobile-warning-content">
+    <span class="mobile-warning-icon">&#128187;</span>
+    <div class="mobile-warning-text">
+      <strong>Mejor experiencia en escritorio</strong>
+      <p>TodoPMP Gantt esta optimizado para pantallas grandes. En dispositivos moviles algunas funciones pueden ser limitadas.</p>
+    </div>
+    <button class="mobile-warning-close" onclick="document.getElementById('mobile-warning').style.display='none'">&#10005;</button>
+  </div>
+</div>
+
 <div id="app">
 
   <!-- ===== SIDEBAR ===== -->
@@ -196,14 +208,27 @@
     </nav>
 
     <div class="sidebar-footer">
-      <a href="https://todopmp.com/procesos-pmbok/" target="_blank" rel="noopener" class="sidebar-banner">
-        <span class="sidebar-banner-icon">&#128203;</span>
+      <a href="https://docs.google.com/document/d/1m_r0L37YiLCAljCK6D02lbg5ciy3RFyypi89-0V4aFo/edit?usp=sharing" target="_blank" rel="noopener" class="sidebar-banner">
+        <span class="sidebar-banner-icon">&#10067;</span>
         <div class="sidebar-banner-text">
-          <strong>40 Procesos PMBOK 8</strong>
-          <span>Explora los procesos PMBOK</span>
+          <strong>Manual de Usuario</strong>
+          <span>Aprende a usar TodoPMP Gantt</span>
         </div>
         <span class="sidebar-banner-arrow">&#8594;</span>
       </a>
+      <a href="https://todopmp.com/procesos-pmbok/" target="_blank" rel="noopener" class="sidebar-banner sidebar-banner--pmbok">
+        <span class="sidebar-banner-icon">&#128218;</span>
+        <div class="sidebar-banner-text">
+          <strong>40 Procesos PMBOK 8</strong>
+          <span>Entradas, herramientas y salidas</span>
+          <span class="pmbok-badge">GUIA COMPLETA</span>
+        </div>
+        <span class="sidebar-banner-arrow">&#8594;</span>
+      </a>
+      <div class="sidebar-disclaimer">
+        <span class="sidebar-disclaimer-icon">&#9888;</span>
+        <span>Producto en desarrollo. Puede contener errores. Usa bajo tu propio criterio.</span>
+      </div>
     </div>
   </aside>
 
