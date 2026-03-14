@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gantt-pmi",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8080", "--directory", "/Users/oscargascon/Desktop/Curso_agosto_2025/Planeacion_2026/Herramientas/gantt-pmi"],
+      "port": 8080
+    }
+  ]
+}

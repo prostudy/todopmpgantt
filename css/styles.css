@@ -455,6 +455,14 @@ body {
 
 .btn:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
 
+/* ---- Ad Container ---- */
+.ad-container {
+  padding: 4px 16px;
+  background: var(--bg-content);
+  max-height: 100px;
+  overflow: hidden;
+}
+
 /* ---- Content Area ---- */
 .content {
   flex: 1;
