@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/config.php';
+set_time_limit(300);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
 $allowed = ['http://localhost', 'http://127.0.0.1', 'https://todopmp.com','http://localhost:8888/gantt-pmi/','https://todopmp.com/gantt',
@@ -141,7 +142,6 @@ GEN_RULES;
 
 // ── CONSTRUIR PROMPT SEGÚN MODO (NUEVO O CONTINUACIÓN) ──────────────────────
 if ($continuation) {
-    // Multi-pass: continuación de proyecto existente
     $existingResources = json_encode($continuation['resources'] ?? [], JSON_UNESCAPED_UNICODE);
     $existingPhases    = json_encode($continuation['generatedPhases'] ?? [], JSON_UNESCAPED_UNICODE);
     $nextTaskId        = $continuation['nextTaskId'] ?? 1;
@@ -205,7 +205,6 @@ PROMPT;
 
     $userMessage = "Continúa generando las tareas del proyecto:\n\n{$description}\n\nGenera las subtareas detalladas SOLO para estas fases pendientes: " . implode(', ', $continuation['remainingPhases'] ?? []);
 } else {
-    // Primera generación (o generación única para basic/detailed)
     $systemPrompt = <<<PROMPT
 Eres un experto en gestión de proyectos certificado PMP/PMI-SP.
 Tu ÚNICA función es generar un cronograma de proyecto completo en formato JSON.
@@ -232,12 +231,12 @@ if ($validationHint) {
     $userMessage .= "\n\nIMPORTANTE: El intento anterior falló la validación con estos errores:\n{$validationHint}\nCorrige estos errores en tu respuesta.";
 }
 
-// ── PAYLOAD PARA OPENAI ─────────────────────────────────────────────────────
+// ── PAYLOAD PARA OPENAI (STREAMING) ──────────────────────────────────────────
 $payload = json_encode([
     'model'           => OPENAI_MODEL,
     'temperature'     => 0.7,
     'max_tokens'      => $config['maxTokens'],
-    'stream'          => false,
+    'stream'          => true,
     'response_format' => ['type' => 'json_object'],
     'messages'        => [
         ['role' => 'system', 'content' => $systemPrompt],
@@ -245,9 +244,21 @@ $payload = json_encode([
     ],
 ], JSON_UNESCAPED_UNICODE);
 
-// ── REQUEST A OPENAI ─────────────────────────────────────────────────────────
-header('Content-Type: application/json; charset=utf-8');
+// ── SSE STREAMING RESPONSE ──────────────────────────────────────────────────
+header('Content-Type: text/event-stream; charset=utf-8');
+header('X-Accel-Buffering: no');
 header('Cache-Control: no-cache');
+
+while (ob_get_level()) { ob_end_flush(); }
+
+// Send initial progress event
+echo "event: progress\ndata: Conectando con IA...\n\n";
+flush();
+
+$sseBuffer  = '';
+$jsonBuffer = '';
+$tokenCount = 0;
+$isContinuation = !empty($continuation);
 
 $ch = curl_init('https://api.openai.com/v1/chat/completions');
 curl_setopt_array($ch, [
@@ -256,44 +267,72 @@ curl_setopt_array($ch, [
     CURLOPT_HTTPHEADER     => [
         'Content-Type: application/json',
         'Authorization: Bearer ' . OPENAI_API_KEY,
+        'Accept: text/event-stream',
     ],
-    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_RETURNTRANSFER => false,
+    CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$sseBuffer, &$jsonBuffer, &$tokenCount) {
+        $sseBuffer .= $data;
+        $lines = explode("\n", $sseBuffer);
+        $sseBuffer = array_pop($lines);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (substr($line, 0, 6) !== 'data: ') continue;
+            $json = substr($line, 6);
+            if ($json === '[DONE]') {
+                echo "event: progress\ndata: Procesando respuesta...\n\n";
+                flush();
+                break;
+            }
+            $chunk = json_decode($json, true);
+            $content = $chunk['choices'][0]['delta']['content'] ?? '';
+            if ($content !== '') {
+                $jsonBuffer .= $content;
+                $tokenCount++;
+                // Send progress every 50 tokens to keep connection alive
+                if ($tokenCount % 50 === 0) {
+                    echo "event: progress\ndata: Generando... ({$tokenCount} tokens)\n\n";
+                    flush();
+                }
+            }
+        }
+        return strlen($data);
+    },
     CURLOPT_TIMEOUT        => 180,
     CURLOPT_CONNECTTIMEOUT => 10,
     CURLOPT_SSL_VERIFYPEER => true,
 ]);
 
-$response = curl_exec($ch);
+$ok = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-if (!$response || $httpCode >= 400) {
-    http_response_code(502);
-    echo json_encode(['error' => 'Error al conectar con OpenAI (HTTP ' . $httpCode . ')']);
+if (!$ok || $httpCode >= 400) {
+    echo "event: error\ndata: " . json_encode(['error' => 'Error al conectar con OpenAI (HTTP ' . $httpCode . ')']) . "\n\n";
+    flush();
     exit;
 }
 
-$result = json_decode($response, true);
-$content = $result['choices'][0]['message']['content'] ?? null;
-
-if (!$content) {
-    http_response_code(502);
-    echo json_encode(['error' => 'Respuesta vacía de OpenAI']);
+if (empty($jsonBuffer)) {
+    echo "event: error\ndata: " . json_encode(['error' => 'Respuesta vacía de OpenAI']) . "\n\n";
+    flush();
     exit;
 }
 
-// Devolver el JSON generado directamente
-$parsed = json_decode($content, true);
+$parsed = json_decode($jsonBuffer, true);
 if (!$parsed) {
-    http_response_code(502);
-    echo json_encode(['error' => 'La IA no generó JSON válido', 'raw' => substr($content, 0, 500)]);
+    echo "event: error\ndata: " . json_encode(['error' => 'La IA no generó JSON válido', 'raw' => substr($jsonBuffer, 0, 500)]) . "\n\n";
+    flush();
     exit;
 }
 
-// Para continuación, devolver solo las tareas adicionales
-if ($continuation) {
-    echo json_encode(['tasks' => $parsed['tasks'] ?? []]);
+// Send the complete result
+if ($isContinuation) {
+    $result = json_encode(['tasks' => $parsed['tasks'] ?? []], JSON_UNESCAPED_UNICODE);
 } else {
-    echo json_encode(['project' => $parsed]);
+    $result = json_encode(['project' => $parsed], JSON_UNESCAPED_UNICODE);
 }
+
+echo "event: complete\ndata: {$result}\n\n";
+flush();
 exit;

@@ -761,11 +761,53 @@ const app = createApp({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({}));
-        throw new Error(err.error || 'Error HTTP ' + response.status);
+
+      if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
+        const text = await response.text();
+        try {
+          const err = JSON.parse(text);
+          throw new Error(err.error || 'Error HTTP ' + response.status);
+        } catch (e) {
+          if (e.message.includes('Error')) throw e;
+          throw new Error('Error HTTP ' + response.status);
+        }
       }
-      return response.json();
+
+      // Read SSE stream from backend
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let result = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        let eventType = null;
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.substring(7).trim();
+          } else if (line.startsWith('data: ')) {
+            const data = line.substring(6);
+            if (eventType === 'progress') {
+              generateStatus.value = data;
+            } else if (eventType === 'complete') {
+              result = JSON.parse(data);
+            } else if (eventType === 'error') {
+              const err = JSON.parse(data);
+              throw new Error(err.error || 'Error del servidor');
+            }
+            eventType = null;
+          }
+        }
+      }
+
+      if (!result) throw new Error('Respuesta incompleta del servidor');
+      return result;
     }
 
     async function generateSinglePass(description, complexity) {
