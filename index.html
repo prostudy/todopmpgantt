@@ -922,9 +922,36 @@
                   placeholder="Ej: Desarrollo de una aplicacion mobile de delivery con React Native y backend en Node.js. Incluir fases de analisis, diseno UX/UI, desarrollo frontend y backend, testing, y deployment a App Store y Google Play."
                   :disabled="generateLoading"></textarea>
 
+        <div class="generate-complexity-selector">
+          <label class="generate-complexity-label">Nivel de detalle:</label>
+          <div class="generate-complexity-options">
+            <button class="complexity-option" :class="{ active: generateComplexity === 'basic' }"
+                    @click="generateComplexity = 'basic'" :disabled="generateLoading">
+              <span class="complexity-icon">&#9898;</span>
+              <span class="complexity-name">Basico</span>
+              <span class="complexity-desc">15–30 tareas</span>
+            </button>
+            <button class="complexity-option" :class="{ active: generateComplexity === 'detailed' }"
+                    @click="generateComplexity = 'detailed'" :disabled="generateLoading">
+              <span class="complexity-icon">&#9899;</span>
+              <span class="complexity-name">Detallado</span>
+              <span class="complexity-desc">40–80 tareas</span>
+            </button>
+            <button class="complexity-option" :class="{ active: generateComplexity === 'complete' }"
+                    @click="generateComplexity = 'complete'" :disabled="generateLoading">
+              <span class="complexity-icon">&#128308;</span>
+              <span class="complexity-name">Completo</span>
+              <span class="complexity-desc">100–200 tareas</span>
+            </button>
+          </div>
+        </div>
+
         <div v-if="generateStatus" class="generate-status">
           <div class="ai-spinner" style="width:16px;height:16px"></div>
           <span>{{ generateStatus }}</span>
+          <div v-if="generateProgress > 0" class="generate-progress-bar">
+            <div class="generate-progress-fill" :style="{ width: generateProgress + '%' }"></div>
+          </div>
         </div>
 
         <div class="modal-actions">
