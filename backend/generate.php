@@ -255,10 +255,54 @@ while (ob_get_level()) { ob_end_flush(); }
 echo "event: progress\ndata: Conectando con IA...\n\n";
 flush();
 
-$sseBuffer  = '';
-$jsonBuffer = '';
-$tokenCount = 0;
+$sseBuffer   = '';
+$jsonBuffer  = '';
+$tokenCount  = 0;
+$streamError = '';
 $isContinuation = !empty($continuation);
+
+// Helper: process a batch of SSE lines from OpenAI
+function processSSELines($lines, &$jsonBuffer, &$tokenCount, &$streamError) {
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if ($line === '') continue;
+
+        // Detect non-SSE error responses (plain JSON error from OpenAI)
+        if (substr($line, 0, 1) === '{') {
+            $errObj = json_decode($line, true);
+            if ($errObj && isset($errObj['error'])) {
+                $streamError = $errObj['error']['message'] ?? 'Error desconocido de OpenAI';
+                return;
+            }
+        }
+
+        if (substr($line, 0, 6) !== 'data: ') continue;
+        $json = substr($line, 6);
+        if ($json === '[DONE]') {
+            echo "event: progress\ndata: Procesando respuesta...\n\n";
+            flush();
+            continue;
+        }
+        $chunk = json_decode($json, true);
+        if (!$chunk) continue;
+
+        // Check for API errors inside stream chunks
+        if (isset($chunk['error'])) {
+            $streamError = $chunk['error']['message'] ?? 'Error de OpenAI en stream';
+            return;
+        }
+
+        $content = $chunk['choices'][0]['delta']['content'] ?? '';
+        if ($content !== '') {
+            $jsonBuffer .= $content;
+            $tokenCount++;
+            if ($tokenCount % 50 === 0) {
+                echo "event: progress\ndata: Generando... ({$tokenCount} tokens)\n\n";
+                flush();
+            }
+        }
+    }
+}
 
 $ch = curl_init('https://api.openai.com/v1/chat/completions');
 curl_setopt_array($ch, [
@@ -270,32 +314,13 @@ curl_setopt_array($ch, [
         'Accept: text/event-stream',
     ],
     CURLOPT_RETURNTRANSFER => false,
-    CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$sseBuffer, &$jsonBuffer, &$tokenCount) {
+    CURLOPT_WRITEFUNCTION  => function($ch, $data) use (&$sseBuffer, &$jsonBuffer, &$tokenCount, &$streamError) {
         $sseBuffer .= $data;
         $lines = explode("\n", $sseBuffer);
-        $sseBuffer = array_pop($lines);
+        $sseBuffer = array_pop($lines); // keep last (possibly incomplete) line
 
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (substr($line, 0, 6) !== 'data: ') continue;
-            $json = substr($line, 6);
-            if ($json === '[DONE]') {
-                echo "event: progress\ndata: Procesando respuesta...\n\n";
-                flush();
-                break;
-            }
-            $chunk = json_decode($json, true);
-            $content = $chunk['choices'][0]['delta']['content'] ?? '';
-            if ($content !== '') {
-                $jsonBuffer .= $content;
-                $tokenCount++;
-                // Send progress every 50 tokens to keep connection alive
-                if ($tokenCount % 50 === 0) {
-                    echo "event: progress\ndata: Generando... ({$tokenCount} tokens)\n\n";
-                    flush();
-                }
-            }
-        }
+        processSSELines($lines, $jsonBuffer, $tokenCount, $streamError);
+
         return strlen($data);
     },
     CURLOPT_TIMEOUT        => 180,
@@ -305,23 +330,55 @@ curl_setopt_array($ch, [
 
 $ok = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlError = curl_error($ch);
 curl_close($ch);
 
-if (!$ok || $httpCode >= 400) {
-    echo "event: error\ndata: " . json_encode(['error' => 'Error al conectar con OpenAI (HTTP ' . $httpCode . ')']) . "\n\n";
+// Process any remaining data left in the SSE buffer
+if (!empty($sseBuffer)) {
+    $remaining = explode("\n", $sseBuffer);
+    processSSELines($remaining, $jsonBuffer, $tokenCount, $streamError);
+}
+
+// Handle curl errors
+if (!$ok) {
+    $errMsg = $curlError ?: 'Error de conexión con OpenAI';
+    echo "event: error\ndata: " . json_encode(['error' => $errMsg]) . "\n\n";
+    flush();
+    exit;
+}
+
+// Handle stream-level errors from OpenAI
+if ($streamError) {
+    echo "event: error\ndata: " . json_encode(['error' => 'OpenAI: ' . $streamError]) . "\n\n";
     flush();
     exit;
 }
 
 if (empty($jsonBuffer)) {
-    echo "event: error\ndata: " . json_encode(['error' => 'Respuesta vacía de OpenAI']) . "\n\n";
+    echo "event: error\ndata: " . json_encode(['error' => 'Respuesta vacía de OpenAI (HTTP ' . $httpCode . ')']) . "\n\n";
     flush();
     exit;
 }
 
+// Trim and attempt to parse JSON
+$jsonBuffer = trim($jsonBuffer);
 $parsed = json_decode($jsonBuffer, true);
+
 if (!$parsed) {
-    echo "event: error\ndata: " . json_encode(['error' => 'La IA no generó JSON válido', 'raw' => substr($jsonBuffer, 0, 500)]) . "\n\n";
+    // Try to extract JSON if wrapped in markdown code fences
+    if (preg_match('/```(?:json)?\s*(\\{.*\\})\s*```/s', $jsonBuffer, $m)) {
+        $parsed = json_decode($m[1], true);
+    }
+    // Try to find JSON object in the buffer
+    if (!$parsed && ($start = strpos($jsonBuffer, '{')) !== false) {
+        $candidate = substr($jsonBuffer, $start);
+        $parsed = json_decode($candidate, true);
+    }
+}
+
+if (!$parsed) {
+    $raw = substr($jsonBuffer, 0, 300);
+    echo "event: error\ndata: " . json_encode(['error' => 'La IA no generó JSON válido', 'raw' => $raw], JSON_UNESCAPED_UNICODE) . "\n\n";
     flush();
     exit;
 }
