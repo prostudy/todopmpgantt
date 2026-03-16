@@ -28,6 +28,13 @@ const app = createApp({
     const aiLoading = ref(false);
     const showColumnMenu = ref(false);
 
+    // ---- AI Project Generator ----
+    const showGenerateModal = ref(false);
+    const generateLoading = ref(false);
+    const generateDescription = ref('');
+    const generateStatus = ref('');
+    const generatePreview = ref(null);
+
     // ---- Column Visibility ----
     const columnDefaults = {
       wbs: true, duration: true, start: true, end: true,
@@ -671,6 +678,164 @@ const app = createApp({
       if (tab === 'resources') checkOverallocations();
     });
 
+    // ---- AI Project Generator ----
+    function validateGeneratedProject(data) {
+      const errors = [];
+      if (!data.name) errors.push('Falta nombre del proyecto');
+      if (!data.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(data.startDate)) errors.push('Falta o invalida fecha de inicio (YYYY-MM-DD)');
+      if (!Array.isArray(data.tasks) || data.tasks.length === 0) errors.push('No tiene tareas');
+      if (!Array.isArray(data.resources) || data.resources.length === 0) errors.push('No tiene recursos');
+      if (!errors.length) {
+        const taskIds = new Set(data.tasks.map(t => t.id));
+        const resIds = new Set(data.resources.map(r => r.id));
+        data.tasks.forEach(t => {
+          if (!t.id || !t.name) errors.push('Task sin id o name');
+          if (t.duration == null) errors.push('Task ' + (t.id || '?') + ' sin duration');
+          if (t.parentId && !taskIds.has(t.parentId)) errors.push('parentId ' + t.parentId + ' no existe');
+          (t.predecessors || []).forEach(p => {
+            if (!taskIds.has(p.taskId)) errors.push('predecessor ' + p.taskId + ' no existe en task ' + t.id);
+            if (!['FS','SS','FF','SF'].includes(p.type)) errors.push('tipo dependencia invalido: ' + p.type);
+          });
+          (t.resourceAssignments || []).forEach(a => {
+            if (!resIds.has(a.resourceId)) errors.push('resourceId ' + a.resourceId + ' no existe en task ' + t.id);
+          });
+        });
+        data.resources.forEach(r => {
+          if (!r.id || !r.name) errors.push('Resource sin id o name');
+        });
+      }
+      return { valid: errors.length === 0, errors };
+    }
+
+    function normalizeGeneratedProject(data) {
+      // Ensure all required fields exist with defaults
+      data.statusDate = data.statusDate || data.startDate;
+      data.hoursPerDay = data.hoursPerDay || 8;
+      data.calendarWorkdays = data.calendarWorkdays || [1, 2, 3, 4, 5];
+      data.baselines = data.baselines || [];
+      data.tasks = (data.tasks || []).map(t => ({
+        id: t.id,
+        wbsCode: '',
+        name: t.name || '',
+        duration: t.duration || 0,
+        startDate: null,
+        endDate: null,
+        predecessors: (t.predecessors || []).map(p => ({
+          taskId: p.taskId,
+          type: p.type || 'FS',
+          lag: p.lag || 0
+        })),
+        resourceAssignments: (t.resourceAssignments || []).map(a => ({
+          resourceId: a.resourceId,
+          units: a.units || 100
+        })),
+        plannedCost: t.plannedCost || 0,
+        actualCost: t.actualCost || 0,
+        percentComplete: t.percentComplete || 0,
+        isMilestone: t.isMilestone || t.duration === 0,
+        isSummary: false, // recalculated by DataModel
+        parentId: t.parentId || null,
+        notes: t.notes || '',
+        earlyStart: null, earlyFinish: null,
+        lateStart: null, lateFinish: null,
+        totalFloat: null, freeFloat: null,
+        isCritical: false,
+        collapsed: false,
+        level: 0
+      }));
+      data.resources = (data.resources || []).map(r => ({
+        id: r.id,
+        name: r.name || '',
+        type: r.type || 'work',
+        costPerHour: r.costPerHour || 0,
+        maxUnits: r.maxUnits || 100
+      }));
+      return data;
+    }
+
+    async function generateProjectWithAI() {
+      if (!generateDescription.value.trim()) return;
+      const maxRetries = 3;
+      generateLoading.value = true;
+      generatePreview.value = null;
+      let lastErrors = null;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        generateStatus.value = attempt === 1
+          ? 'Generando proyecto con IA...'
+          : 'Reintentando (' + attempt + '/' + maxRetries + ')...';
+
+        try {
+          const payload = { description: generateDescription.value };
+          if (lastErrors) {
+            payload.validationErrors = lastErrors.join('; ');
+          }
+
+          const response = await fetch('backend/generate.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Error HTTP ' + response.status);
+          }
+
+          const result = await response.json();
+          const data = result.project;
+
+          if (!data) throw new Error('Respuesta sin proyecto');
+
+          generateStatus.value = 'Validando estructura...';
+          const validation = validateGeneratedProject(data);
+
+          if (validation.valid) {
+            generatePreview.value = normalizeGeneratedProject(data);
+            generateStatus.value = '';
+            generateLoading.value = false;
+            return;
+          }
+
+          lastErrors = validation.errors.slice(0, 5);
+          if (attempt === maxRetries) {
+            generateStatus.value = '';
+            generateLoading.value = false;
+            toast('No se pudo generar un proyecto valido despues de ' + maxRetries + ' intentos. Intente con una descripcion mas detallada.', 'error');
+            return;
+          }
+        } catch (err) {
+          if (attempt === maxRetries) {
+            generateStatus.value = '';
+            generateLoading.value = false;
+            toast('Error: ' + err.message, 'error');
+            return;
+          }
+          lastErrors = [err.message];
+        }
+      }
+    }
+
+    function applyGeneratedProject() {
+      if (!generatePreview.value) return;
+      const data = generatePreview.value;
+      Object.assign(project, {
+        name: data.name,
+        startDate: data.startDate,
+        statusDate: data.statusDate,
+        hoursPerDay: data.hoursPerDay,
+        calendarWorkdays: data.calendarWorkdays,
+        tasks: data.tasks,
+        resources: data.resources,
+        baselines: [],
+      });
+      recalculate();
+      showGenerateModal.value = false;
+      generatePreview.value = null;
+      generateDescription.value = '';
+      toast('Proyecto generado con IA aplicado exitosamente', 'success');
+    }
+
     // ---- Onboarding Tour ----
     function startOnboardingTour() {
       if (!window.driver) return;
@@ -908,6 +1073,9 @@ const app = createApp({
       exportTasksCSV, exportResourcesCSV, exportEVMCSV, exportProjectJSON,
       importCSV, importResourcesCSV, exportGanttImage, loadDemo,
       showAIModal, aiAnalysisHTML, aiLoading, analyzeWithAI,
+      // AI Generator
+      showGenerateModal, generateLoading, generateDescription, generateStatus, generatePreview,
+      generateProjectWithAI, applyGeneratedProject,
       // Onboarding
       startOnboardingTour,
       // Helpers
