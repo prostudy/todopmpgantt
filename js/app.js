@@ -34,8 +34,6 @@ const app = createApp({
     const generateDescription = ref('');
     const generateStatus = ref('');
     const generatePreview = ref(null);
-    const generateComplexity = ref('basic');
-    const generateProgress = ref(0);
 
     // ---- Column Visibility ----
     const columnDefaults = {
@@ -755,233 +753,66 @@ const app = createApp({
       return data;
     }
 
-    async function callGenerateAPI(payload) {
-      const response = await fetch('backend/generate.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
-        const text = await response.text();
-        try {
-          const err = JSON.parse(text);
-          throw new Error(err.error || 'Error HTTP ' + response.status);
-        } catch (e) {
-          if (e.message.includes('Error')) throw e;
-          throw new Error('Error HTTP ' + response.status);
-        }
-      }
-
-      // Read SSE stream from backend
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let result = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        let eventType = null;
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.substring(7).trim();
-          } else if (line.startsWith('data: ')) {
-            const data = line.substring(6);
-            if (eventType === 'progress') {
-              generateStatus.value = data;
-            } else if (eventType === 'complete') {
-              result = JSON.parse(data);
-            } else if (eventType === 'error') {
-              const err = JSON.parse(data);
-              throw new Error(err.error || 'Error del servidor');
-            }
-            eventType = null;
-          }
-        }
-      }
-
-      if (!result) throw new Error('Respuesta incompleta del servidor');
-      return result;
-    }
-
-    async function generateSinglePass(description, complexity) {
+    async function generateProjectWithAI() {
+      if (!generateDescription.value.trim()) return;
       const maxRetries = 3;
+      generateLoading.value = true;
+      generatePreview.value = null;
       let lastErrors = null;
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         generateStatus.value = attempt === 1
           ? 'Generando proyecto con IA...'
           : 'Reintentando (' + attempt + '/' + maxRetries + ')...';
-        generateProgress.value = attempt === 1 ? 20 : 20 + (attempt * 10);
 
         try {
-          const payload = { description, complexity };
-          if (lastErrors) payload.validationErrors = lastErrors.join('; ');
+          const payload = { description: generateDescription.value };
+          if (lastErrors) {
+            payload.validationErrors = lastErrors.join('; ');
+          }
 
-          const result = await callGenerateAPI(payload);
+          const response = await fetch('backend/generate.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Error HTTP ' + response.status);
+          }
+
+          const result = await response.json();
           const data = result.project;
+
           if (!data) throw new Error('Respuesta sin proyecto');
 
           generateStatus.value = 'Validando estructura...';
-          generateProgress.value = 80;
           const validation = validateGeneratedProject(data);
 
           if (validation.valid) {
-            generateProgress.value = 100;
-            return normalizeGeneratedProject(data);
+            generatePreview.value = normalizeGeneratedProject(data);
+            generateStatus.value = '';
+            generateLoading.value = false;
+            return;
           }
 
           lastErrors = validation.errors.slice(0, 5);
           if (attempt === maxRetries) {
-            throw new Error('No se pudo generar proyecto valido en ' + maxRetries + ' intentos');
+            generateStatus.value = '';
+            generateLoading.value = false;
+            toast('No se pudo generar un proyecto valido despues de ' + maxRetries + ' intentos. Intente con una descripcion mas detallada.', 'error');
+            return;
           }
         } catch (err) {
-          if (attempt === maxRetries) throw err;
+          if (attempt === maxRetries) {
+            generateStatus.value = '';
+            generateLoading.value = false;
+            toast('Error: ' + err.message, 'error');
+            return;
+          }
           lastErrors = [err.message];
         }
-      }
-    }
-
-    async function generateMultiPass(description) {
-      // Pass 1: Generate base project with first batch of phases
-      generateStatus.value = 'Generando estructura del proyecto (Fase 1/2)...';
-      generateProgress.value = 10;
-
-      let baseProject;
-      let lastErrors = null;
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        if (attempt > 1) generateStatus.value = 'Reintentando fase 1 (' + attempt + '/3)...';
-        try {
-          const payload = { description, complexity: 'complete' };
-          if (lastErrors) payload.validationErrors = lastErrors.join('; ');
-          const result = await callGenerateAPI(payload);
-          baseProject = result.project;
-          if (!baseProject) throw new Error('Respuesta sin proyecto');
-
-          const validation = validateGeneratedProject(baseProject);
-          if (validation.valid) break;
-
-          lastErrors = validation.errors.slice(0, 5);
-          if (attempt === 3) {
-            // Accept partial result if structure is at least valid for base
-            if (baseProject.tasks && baseProject.tasks.length > 0 && baseProject.resources) break;
-            throw new Error('No se pudo generar la estructura base');
-          }
-        } catch (err) {
-          if (attempt === 3) throw err;
-          lastErrors = [err.message];
-        }
-      }
-
-      generateProgress.value = 45;
-
-      // Analyze what phases were generated and determine remaining ones
-      const phaseTasks = baseProject.tasks.filter(t => !t.parentId || t.parentId === null);
-      const subtaskCounts = {};
-      phaseTasks.forEach(p => {
-        subtaskCounts[p.id] = baseProject.tasks.filter(t => t.parentId === p.id && !t.isMilestone).length;
-      });
-
-      // Find phases with few subtasks (< 5) that need expansion
-      const sparsePhases = phaseTasks.filter(p => subtaskCounts[p.id] < 5).map(p => p.name);
-      // Also identify phases that could use more detail
-      const allPhaseNames = phaseTasks.map(p => p.name);
-
-      // If we already have 100+ tasks, skip pass 2
-      if (baseProject.tasks.length >= 100) {
-        generateProgress.value = 100;
-        return normalizeGeneratedProject(baseProject);
-      }
-
-      // Pass 2: Generate additional detailed tasks for phases that need more
-      generateStatus.value = 'Expandiendo detalle de fases (Fase 2/2)...';
-      generateProgress.value = 55;
-
-      const maxTaskId = Math.max(...baseProject.tasks.map(t => parseInt(t.id.replace('t', '')) || 0));
-      const generatedPhases = phaseTasks.filter(p => subtaskCounts[p.id] >= 5).map(p => p.name);
-      const phasesToExpand = sparsePhases.length > 0 ? sparsePhases : allPhaseNames.slice(Math.floor(allPhaseNames.length / 2));
-
-      try {
-        const continuationPayload = {
-          description,
-          complexity: 'complete',
-          continuation: {
-            resources: baseProject.resources,
-            generatedPhases: generatedPhases,
-            remainingPhases: phasesToExpand,
-            nextTaskId: maxTaskId + 1
-          }
-        };
-
-        const contResult = await callGenerateAPI(continuationPayload);
-        const additionalTasks = contResult.tasks || [];
-
-        generateStatus.value = 'Ensamblando proyecto completo...';
-        generateProgress.value = 85;
-
-        if (additionalTasks.length > 0) {
-          // For sparse phases: remove old sparse subtasks and replace with detailed ones
-          if (sparsePhases.length > 0) {
-            const sparsePhaseIds = new Set(
-              phaseTasks.filter(p => sparsePhases.includes(p.name)).map(p => p.id)
-            );
-            // Keep non-sparse tasks + phase headers for sparse phases
-            baseProject.tasks = baseProject.tasks.filter(t =>
-              !sparsePhaseIds.has(t.parentId)
-            );
-          }
-          // Add new tasks, avoiding duplicate IDs
-          const existingIds = new Set(baseProject.tasks.map(t => t.id));
-          additionalTasks.forEach(t => {
-            if (!existingIds.has(t.id)) {
-              baseProject.tasks.push(t);
-              existingIds.add(t.id);
-            }
-          });
-        }
-      } catch (err) {
-        // If pass 2 fails, we still have the base project from pass 1
-        console.warn('Pass 2 failed, using base project:', err.message);
-        toast('Nota: Se genero un proyecto parcial. Algunas fases pueden tener menos detalle.', 'warning');
-      }
-
-      generateProgress.value = 100;
-      generateStatus.value = 'Validando proyecto final...';
-
-      return normalizeGeneratedProject(baseProject);
-    }
-
-    async function generateProjectWithAI() {
-      if (!generateDescription.value.trim()) return;
-      generateLoading.value = true;
-      generatePreview.value = null;
-      generateProgress.value = 0;
-
-      try {
-        const complexity = generateComplexity.value;
-        let result;
-
-        if (complexity === 'complete') {
-          result = await generateMultiPass(generateDescription.value);
-        } else {
-          result = await generateSinglePass(generateDescription.value, complexity);
-        }
-
-        generatePreview.value = result;
-        generateStatus.value = '';
-        generateProgress.value = 0;
-        generateLoading.value = false;
-      } catch (err) {
-        generateStatus.value = '';
-        generateProgress.value = 0;
-        generateLoading.value = false;
-        toast('Error: ' + err.message, 'error');
       }
     }
 
@@ -1253,7 +1084,6 @@ const app = createApp({
       showAIModal, aiAnalysisHTML, aiLoading, analyzeWithAI,
       // AI Generator
       showGenerateModal, generateLoading, generateDescription, generateStatus, generatePreview,
-      generateComplexity, generateProgress,
       generateProjectWithAI, applyGeneratedProject,
       // Onboarding
       startOnboardingTour,
