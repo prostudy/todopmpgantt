@@ -26,6 +26,57 @@ const app = createApp({
     const showAIModal = ref(false);
     const aiAnalysisHTML = ref('');
     const aiLoading = ref(false);
+    const showColumnMenu = ref(false);
+
+    // ---- Column Visibility ----
+    const columnDefaults = {
+      wbs: true, duration: true, start: true, end: true,
+      predecessors: false, resources: false,
+      plannedCost: false, actualCost: false,
+      percent: true,
+      totalFloat: false, freeFloat: false, critical: false
+    };
+
+    const columnVisibility = reactive(Object.assign({}, columnDefaults));
+
+    const columnPresets = {
+      basica: { wbs: true, duration: true, start: true, end: true, predecessors: false, resources: false, plannedCost: false, actualCost: false, percent: true, totalFloat: false, freeFloat: false, critical: false },
+      cronograma: { wbs: true, duration: true, start: true, end: true, predecessors: true, resources: false, plannedCost: false, actualCost: false, percent: true, totalFloat: true, freeFloat: true, critical: true },
+      costos: { wbs: true, duration: true, start: true, end: true, predecessors: false, resources: true, plannedCost: true, actualCost: true, percent: true, totalFloat: false, freeFloat: false, critical: false },
+      completa: { wbs: true, duration: true, start: true, end: true, predecessors: true, resources: true, plannedCost: true, actualCost: true, percent: true, totalFloat: true, freeFloat: true, critical: true }
+    };
+
+    const columnLabels = {
+      wbs: 'WBS', duration: 'Duración', start: 'Inicio', end: 'Fin',
+      predecessors: 'Predecesores', resources: 'Recursos',
+      plannedCost: 'Costo Plan', actualCost: 'Costo Real',
+      percent: '% Avance',
+      totalFloat: 'HT (Holgura Total)', freeFloat: 'HL (Holgura Libre)', critical: 'RC (Ruta Crítica)'
+    };
+
+    function applyColumnPreset(preset) {
+      const config = columnPresets[preset];
+      if (config) Object.assign(columnVisibility, config);
+    }
+
+    const visibleColumnCount = computed(() => {
+      return 3 + Object.values(columnVisibility).filter(Boolean).length; // 3 = #, Nombre, Acciones
+    });
+
+    function loadColumnVisibility() {
+      try {
+        const saved = localStorage.getItem('pmi-gantt-column-visibility');
+        if (saved) Object.assign(columnVisibility, JSON.parse(saved));
+      } catch (e) { /* ignore */ }
+    }
+
+    function saveColumnVisibility() {
+      try {
+        localStorage.setItem('pmi-gantt-column-visibility', JSON.stringify({ ...columnVisibility }));
+      } catch (e) { /* ignore */ }
+    }
+
+    watch(() => ({ ...columnVisibility }), () => saveColumnVisibility(), { deep: true });
 
     // ---- Computed ----
     const orderedTasks = computed(() => DataModel.getOrderedTasks(project.tasks));
@@ -622,11 +673,13 @@ const app = createApp({
 
     // Init
     onMounted(() => {
+      loadColumnVisibility();
       const loaded = loadFromLocalStorage();
       if (loaded && project.tasks.length > 0) {
         recalculate();
         toast('Proyecto cargado desde guardado local', 'info');
       }
+      document.addEventListener('click', () => { showColumnMenu.value = false; });
     });
 
     // Demo project
@@ -721,6 +774,9 @@ const app = createApp({
       activeTab, project, ganttScale, ganttSvg, evmMetrics, evmInterpretations,
       overallocations, toasts, showConfigModal, showTaskModal, editingTask,
       showResourceModal, editingResource, showAssignModal, assigningTask,
+      // Column Visibility
+      columnVisibility, showColumnMenu, columnLabels, columnPresets,
+      applyColumnPreset, visibleColumnCount,
       // Computed
       orderedTasks, totalBudget, totalActualCost, criticalTasks, scurveSvg, histogramData,
       projectEndDate, projectDurationDays,

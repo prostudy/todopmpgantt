@@ -161,7 +161,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.2">
+  <link rel="stylesheet" href="css/styles.css?v=1.3">
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
 </head>
@@ -290,7 +290,32 @@
         <div class="card">
           <div class="card-header">
             <h3>Estructura de Desglose del Trabajo (WBS)</h3>
-            <div style="display:flex;gap:6px">
+            <div style="display:flex;gap:6px;align-items:center">
+              <div class="column-menu-wrapper">
+                <button class="btn btn-toolbar btn-sm" @click.stop="showColumnMenu = !showColumnMenu"
+                        title="Configurar columnas visibles">
+                  &#9776; Columnas
+                </button>
+                <div class="column-menu-dropdown" v-show="showColumnMenu" @click.stop>
+                  <div class="column-menu-section">
+                    <span class="column-menu-label">Vistas predefinidas</span>
+                    <div class="column-preset-group">
+                      <button class="column-preset-btn" @click="applyColumnPreset('basica')">Basica</button>
+                      <button class="column-preset-btn" @click="applyColumnPreset('cronograma')">Cronograma</button>
+                      <button class="column-preset-btn" @click="applyColumnPreset('costos')">Costos</button>
+                      <button class="column-preset-btn column-preset-all" @click="applyColumnPreset('completa')">Completa</button>
+                    </div>
+                  </div>
+                  <div class="column-menu-divider"></div>
+                  <div class="column-menu-section">
+                    <span class="column-menu-label">Columnas individuales</span>
+                    <label v-for="(label, key) in columnLabels" :key="key" class="column-menu-item">
+                      <input type="checkbox" v-model="columnVisibility[key]">
+                      <span>{{ label }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
               <button class="btn btn-primary btn-sm" @click="addTask()">+ Tarea</button>
               <button class="btn btn-warning btn-sm" @click="addMilestone()">+ Hito</button>
             </div>
@@ -301,19 +326,19 @@
               <thead>
                 <tr>
                   <th style="width:30px">#</th>
-                  <th style="width:55px">WBS</th>
+                  <th style="width:55px" v-show="columnVisibility.wbs">WBS</th>
                   <th style="min-width:200px">Nombre de la Tarea</th>
-                  <th style="width:55px">Dur.</th>
-                  <th style="width:100px">Inicio</th>
-                  <th style="width:100px">Fin</th>
-                  <th style="width:100px">Predecesores</th>
-                  <th style="width:100px">Recursos</th>
-                  <th style="width:80px">Costo Plan</th>
-                  <th style="width:80px">Costo Real</th>
-                  <th style="width:50px">%</th>
-                  <th style="width:40px">HT</th>
-                  <th style="width:40px">HL</th>
-                  <th style="width:35px">RC</th>
+                  <th style="width:55px" v-show="columnVisibility.duration">Dur.</th>
+                  <th style="width:100px" v-show="columnVisibility.start">Inicio</th>
+                  <th style="width:100px" v-show="columnVisibility.end">Fin</th>
+                  <th style="width:100px" v-show="columnVisibility.predecessors">Predecesores</th>
+                  <th style="width:100px" v-show="columnVisibility.resources">Recursos</th>
+                  <th style="width:80px" v-show="columnVisibility.plannedCost">Costo Plan</th>
+                  <th style="width:80px" v-show="columnVisibility.actualCost">Costo Real</th>
+                  <th style="width:50px" v-show="columnVisibility.percent">%</th>
+                  <th style="width:40px" v-show="columnVisibility.totalFloat" title="Holgura Total">HT</th>
+                  <th style="width:40px" v-show="columnVisibility.freeFloat" title="Holgura Libre">HL</th>
+                  <th style="width:35px" v-show="columnVisibility.critical" title="Ruta Critica">RC</th>
                   <th style="width:120px">Acciones</th>
                 </tr>
               </thead>
@@ -321,7 +346,7 @@
                 <tr v-for="task in orderedTasks" :key="task.id"
                     :class="{critical: task.isCritical && !task.isSummary, summary: task.isSummary}">
                   <td>{{ getTaskRowNumber(task) }}</td>
-                  <td><span class="wbs-code">{{ task.wbsCode }}</span></td>
+                  <td v-show="columnVisibility.wbs"><span class="wbs-code">{{ task.wbsCode }}</span></td>
                   <td>
                     <div class="task-name-cell">
                       <span v-for="n in task.level" :key="n" class="indent-spacer"></span>
@@ -334,14 +359,14 @@
                              style="min-width:150px">
                     </div>
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.duration">
                     <input type="number" :value="task.duration" min="0"
                            @change="onTaskFieldChange(task, 'duration', $event.target.value)"
                            :disabled="task.isSummary">
                   </td>
-                  <td style="font-size:11px">{{ task.startDate || '-' }}</td>
-                  <td style="font-size:11px">{{ task.endDate || '-' }}</td>
-                  <td>
+                  <td v-show="columnVisibility.start" style="font-size:11px">{{ task.startDate || '-' }}</td>
+                  <td v-show="columnVisibility.end" style="font-size:11px">{{ task.endDate || '-' }}</td>
+                  <td v-show="columnVisibility.predecessors">
                     <input :value="getPredecessorString(task)"
                            @change="onTaskFieldChange(task, 'predecessors', $event.target.value)"
                            placeholder="ej: 1,2FS+1"
@@ -349,39 +374,39 @@
                            title="Formato: #Fila[Tipo][+/-Lag]. Tipos: FS (Fin-Inicio), SS (Inicio-Inicio), FF (Fin-Fin), SF (Inicio-Fin). Ej: 3FS+2 = despues de tarea 3 con 2 dias de lag. Separar con coma: 2,5SS"
                            style="width:110px;font-size:11px">
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.resources">
                     <span style="font-size:11px;cursor:pointer;color:var(--accent)"
                           @click="openAssignResources(task)"
                           :title="getResourceNames(task) || 'Clic para asignar'">
                       {{ getResourceNames(task) || '...' }}
                     </span>
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.plannedCost">
                     <input type="number" :value="task.plannedCost" min="0" step="100"
                            :key="'pc-' + task.id + '-' + task.plannedCost"
                            @change="onTaskFieldChange(task, 'plannedCost', $event.target.value)"
                            :disabled="task.isSummary || task.resourceAssignments.length > 0"
                            :title="task.resourceAssignments.length > 0 ? 'Calculado desde recursos' : 'Ingrese costo manual'">
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.actualCost">
                     <input type="number" :value="task.actualCost" min="0" step="100"
                            @change="onTaskFieldChange(task, 'actualCost', $event.target.value)"
                            :disabled="task.isSummary">
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.percent">
                     <input type="number" :value="task.percentComplete" min="0" max="100"
                            @change="onTaskFieldChange(task, 'percentComplete', $event.target.value)"
                            :disabled="task.isSummary" style="width:45px">
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.totalFloat">
                     <span class="float-value" :class="{critical: task.totalFloat === 0 && !task.isSummary}">
                       {{ task.totalFloat != null ? task.totalFloat : '-' }}
                     </span>
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.freeFloat">
                     <span class="float-value">{{ task.freeFloat != null ? task.freeFloat : '-' }}</span>
                   </td>
-                  <td>
+                  <td v-show="columnVisibility.critical">
                     <span v-if="task.isCritical && !task.isSummary"
                           style="color:var(--danger);font-weight:bold">Si</span>
                     <span v-else style="color:#ccc">-</span>
@@ -399,7 +424,7 @@
                   </td>
                 </tr>
                 <tr v-if="orderedTasks.length === 0">
-                  <td colspan="15" style="text-align:center;padding:20px;color:#999">
+                  <td :colspan="visibleColumnCount" style="text-align:center;padding:20px;color:#999">
                     No hay tareas. Agregue una tarea o cargue el proyecto demo.
                   </td>
                 </tr>
@@ -883,7 +908,7 @@
 <script src="js/resource-engine.js"></script>
 <script src="js/csv-manager.js"></script>
 <script src="js/gantt-renderer.js"></script>
-<script src="js/app.js?v=1.2"></script>
+<script src="js/app.js?v=1.3"></script>
 
 </body>
 </html>
