@@ -671,6 +671,117 @@ const app = createApp({
       if (tab === 'resources') checkOverallocations();
     });
 
+    // ---- Onboarding Tour ----
+    function startOnboardingTour() {
+      if (!window.driver) return;
+      const driverObj = window.driver.js.driver({
+        showProgress: true,
+        progressText: '{{current}} de {{total}}',
+        nextBtnText: 'Siguiente',
+        prevBtnText: 'Anterior',
+        doneBtnText: 'Comenzar!',
+        popoverClass: 'todopmp-tour',
+        allowClose: true,
+        smoothScroll: true,
+        stagePadding: 8,
+        stageRadius: 8,
+        onDestroyed: () => {
+          localStorage.setItem('pmi-gantt-tour-done', 'true');
+        },
+        steps: [
+          {
+            popover: {
+              title: 'Bienvenido a TodoPMP Gantt',
+              description: 'Esta herramienta te permite crear cronogramas profesionales con ruta critica (CPM), valor ganado (EVM) y gestion de recursos. Te mostramos las funciones principales.',
+              side: 'center',
+              align: 'center'
+            }
+          },
+          {
+            element: '.tabs-container',
+            popover: {
+              title: 'Navegacion Principal',
+              description: 'Accede a las 5 secciones: <b>WBS/Tareas</b> para gestionar actividades, <b>Gantt</b> para el diagrama visual, <b>Recursos</b> para asignar equipo, <b>EVM</b> para valor ganado y <b>Linea Base</b> para comparar versiones.',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
+            element: '.project-name-input',
+            popover: {
+              title: 'Nombre del Proyecto',
+              description: 'Dale un nombre a tu proyecto. Se guarda automaticamente en tu navegador.',
+              side: 'bottom',
+              align: 'start'
+            }
+          },
+          {
+            element: '.toolbar',
+            popover: {
+              title: 'Barra de Herramientas',
+              description: 'Crea proyectos nuevos, carga el <b>Demo</b> para explorar, importa/exporta en CSV o JSON, y recalcula el cronograma.',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
+            element: '.task-table-wrapper',
+            popover: {
+              title: 'Tabla WBS (EDT)',
+              description: 'Aqui gestionas las tareas del proyecto: nombre, duracion, fechas, predecesores, costos y porcentaje de avance. Las tareas en <span style="color:var(--danger)">rojo</span> estan en la ruta critica.',
+              side: 'top',
+              align: 'center'
+            }
+          },
+          {
+            element: '.column-menu-wrapper',
+            popover: {
+              title: 'Selector de Columnas',
+              description: 'Personaliza que columnas ver. Usa los presets <b>Basica</b>, <b>Cronograma</b>, <b>Costos</b> o <b>Completa</b> segun lo que necesites.',
+              side: 'bottom',
+              align: 'end'
+            }
+          },
+          {
+            element: '.card-header .btn-primary',
+            popover: {
+              title: 'Agregar Tareas',
+              description: 'Crea nuevas tareas con este boton. Dentro de cada fila puedes agregar sub-tareas, indentar o mover con los botones de accion.',
+              side: 'bottom',
+              align: 'end'
+            }
+          },
+          {
+            element: '.btn-ai',
+            popover: {
+              title: 'Analisis con IA',
+              description: 'Analiza tu proyecto con inteligencia artificial. Obtendras recomendaciones sobre riesgos, ruta critica, recursos y mejores practicas PMI.',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
+            element: '.status-date-group',
+            popover: {
+              title: 'Fecha de Estado',
+              description: 'Define la fecha de corte para los calculos de <b>Valor Ganado (EVM)</b>: SPI, CPI, EAC y demas metricas de desempeno.',
+              side: 'bottom',
+              align: 'end'
+            }
+          },
+          {
+            popover: {
+              title: 'Listo para empezar!',
+              description: 'Carga el proyecto <b>Demo</b> para explorar todas las funciones, o crea tu propio proyecto desde cero. Puedes repetir este tour desde <b>Config</b> en cualquier momento.',
+              side: 'center',
+              align: 'center'
+            }
+          }
+        ]
+      });
+      driverObj.drive();
+    }
+
     // Init
     onMounted(() => {
       loadColumnVisibility();
@@ -680,6 +791,11 @@ const app = createApp({
         toast('Proyecto cargado desde guardado local', 'info');
       }
       document.addEventListener('click', () => { showColumnMenu.value = false; });
+      nextTick(() => {
+        if (!localStorage.getItem('pmi-gantt-tour-done')) {
+          startOnboardingTour();
+        }
+      });
     });
 
     // Demo project
@@ -792,6 +908,8 @@ const app = createApp({
       exportTasksCSV, exportResourcesCSV, exportEVMCSV, exportProjectJSON,
       importCSV, importResourcesCSV, exportGanttImage, loadDemo,
       showAIModal, aiAnalysisHTML, aiLoading, analyzeWithAI,
+      // Onboarding
+      startOnboardingTour,
       // Helpers
       EVMEngine,
     };

@@ -498,6 +498,74 @@ body {
 }
 
 /* ============================================
+   ONBOARDING TOUR (driver.js overrides)
+   ============================================ */
+.todopmp-tour.driver-popover {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 340px;
+}
+
+.todopmp-tour .driver-popover-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  font-family: 'Inter', sans-serif;
+}
+
+.todopmp-tour .driver-popover-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  font-family: 'Inter', sans-serif;
+}
+
+.todopmp-tour .driver-popover-progress-text {
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.todopmp-tour .driver-popover-prev-btn {
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  padding: 6px 14px;
+  font-family: 'Inter', sans-serif;
+}
+
+.todopmp-tour .driver-popover-prev-btn:hover {
+  background: var(--border);
+}
+
+.todopmp-tour .driver-popover-next-btn,
+.todopmp-tour .driver-popover-done-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  padding: 6px 14px;
+  font-family: 'Inter', sans-serif;
+  text-shadow: none;
+}
+
+.todopmp-tour .driver-popover-next-btn:hover,
+.todopmp-tour .driver-popover-done-btn:hover {
+  background: var(--accent-hover);
+}
+
+.todopmp-tour .driver-popover-close-btn {
+  color: var(--text-light);
+}
+
+.todopmp-tour .driver-popover-close-btn:hover {
+  color: var(--text);
+}
+
+/* ============================================
    COLUMN VISIBILITY MENU
    ============================================ */
 .column-menu-wrapper {
