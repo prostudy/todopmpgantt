@@ -917,6 +917,15 @@ const app = createApp({
             }
           },
           {
+            element: '.btn-ai-generate',
+            popover: {
+              title: 'Generar Proyecto con IA',
+              description: 'Describe tu proyecto en lenguaje natural y la IA generara un cronograma completo con tareas, fases, dependencias, recursos y costos. Ideal para arrancar rapidamente.',
+              side: 'bottom',
+              align: 'center'
+            }
+          },
+          {
             element: '.btn-ai',
             popover: {
               title: 'Analisis con IA',
@@ -937,7 +946,7 @@ const app = createApp({
           {
             popover: {
               title: 'Listo para empezar!',
-              description: 'Carga el proyecto <b>Demo</b> para explorar todas las funciones, o crea tu propio proyecto desde cero. Puedes repetir este tour desde <b>Config</b> en cualquier momento.',
+              description: 'Carga el proyecto <b>Demo</b> para explorar, usa <b>Generar con IA</b> para crear un proyecto desde una descripcion, o crea tu propio proyecto desde cero. Puedes repetir este tour desde <b>Config</b> en cualquier momento.',
               side: 'center',
               align: 'center'
             }
