@@ -387,6 +387,12 @@ const app = createApp({
 
     // Inline editing handlers
     function onTaskFieldChange(task, field, value) {
+      // Esc cancels the edit — don't apply changes
+      if (cancelNextFieldChange) {
+        cancelNextFieldChange = false;
+        recalculate(); // re-render to reset input display values
+        return;
+      }
       pushUndo();
       if (field === 'duration') {
         task.duration = parseInt(value) || 0;
@@ -1006,10 +1012,54 @@ const app = createApp({
     }
 
     // ---- Keyboard Shortcuts ----
+    let cancelNextFieldChange = false;
+
     function onTableKeydown(e) {
       const tr = e.target.closest('tr[data-task-id]');
       if (!tr) return;
       const taskId = tr.dataset.taskId;
+
+      // Enter → confirm edit + move to next row (like Excel)
+      if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (e.target.tagName === 'INPUT') {
+          e.preventDefault();
+          e.target.blur(); // triggers @change → confirms edit
+          // Move focus to same column in next row
+          const currentTd = e.target.closest('td');
+          const tdIndex = Array.from(tr.children).indexOf(currentTd);
+          const nextTr = tr.nextElementSibling;
+          if (nextTr && nextTr.dataset.taskId) {
+            nextTick(() => {
+              const nextTd = nextTr.children[tdIndex];
+              const nextInput = nextTd?.querySelector('input');
+              if (nextInput && !nextInput.disabled) {
+                nextInput.focus();
+                nextInput.select();
+              }
+            });
+          }
+        }
+        return;
+      }
+
+      // Escape → cancel edit (revert value) + deselect
+      if (e.key === 'Escape') {
+        if (e.target.tagName === 'INPUT') {
+          e.preventDefault();
+          const input = e.target;
+          cancelNextFieldChange = true;
+          input.blur(); // triggers @change but it will be cancelled
+          // Reset input display to model value
+          const task = project.tasks.find(t => t.id === taskId);
+          if (task) {
+            const field = input.dataset.field;
+            if (field === 'name') input.value = task.name;
+            else if (field === 'predecessors') input.value = getPredecessorString(task);
+            else if (field) input.value = task[field];
+          }
+        }
+        return;
+      }
 
       // Tab / Shift+Tab → indent / outdent
       if (e.key === 'Tab') {

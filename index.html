@@ -364,20 +364,20 @@
                         {{ task.collapsed ? '+' : '-' }}
                       </button>
                       <span v-if="task.isMilestone" style="color:#f97316;margin-right:2px">&#9670;</span>
-                      <input :value="task.name" @change="onTaskFieldChange(task, 'name', $event.target.value)"
+                      <input :value="task.name" data-field="name" @change="onTaskFieldChange(task, 'name', $event.target.value)"
                              :style="{fontWeight: task.isSummary ? 'bold' : 'normal'}"
                              style="min-width:150px">
                     </div>
                   </td>
                   <td v-show="columnVisibility.duration">
-                    <input type="number" :value="task.duration" min="0"
+                    <input type="number" :value="task.duration" min="0" data-field="duration"
                            @change="onTaskFieldChange(task, 'duration', $event.target.value)"
                            :disabled="task.isSummary">
                   </td>
                   <td v-show="columnVisibility.start" style="font-size:11px">{{ task.startDate || '-' }}</td>
                   <td v-show="columnVisibility.end" style="font-size:11px">{{ task.endDate || '-' }}</td>
                   <td v-show="columnVisibility.predecessors">
-                    <input :value="getPredecessorString(task)"
+                    <input :value="getPredecessorString(task)" data-field="predecessors"
                            @change="onTaskFieldChange(task, 'predecessors', $event.target.value)"
                            placeholder="ej: 1,2FS+1"
                            :disabled="task.isSummary"
@@ -392,19 +392,19 @@
                     </span>
                   </td>
                   <td v-show="columnVisibility.plannedCost">
-                    <input type="number" :value="task.plannedCost" min="0" step="100"
+                    <input type="number" :value="task.plannedCost" min="0" step="100" data-field="plannedCost"
                            :key="'pc-' + task.id + '-' + task.plannedCost"
                            @change="onTaskFieldChange(task, 'plannedCost', $event.target.value)"
                            :disabled="task.isSummary || task.resourceAssignments.length > 0"
                            :title="task.resourceAssignments.length > 0 ? 'Calculado desde recursos' : 'Ingrese costo manual'">
                   </td>
                   <td v-show="columnVisibility.actualCost">
-                    <input type="number" :value="task.actualCost" min="0" step="100"
+                    <input type="number" :value="task.actualCost" min="0" step="100" data-field="actualCost"
                            @change="onTaskFieldChange(task, 'actualCost', $event.target.value)"
                            :disabled="task.isSummary">
                   </td>
                   <td v-show="columnVisibility.percent">
-                    <input type="number" :value="task.percentComplete" min="0" max="100"
+                    <input type="number" :value="task.percentComplete" min="0" max="100" data-field="percentComplete"
                            @change="onTaskFieldChange(task, 'percentComplete', $event.target.value)"
                            :disabled="task.isSummary" style="width:45px">
                   </td>
