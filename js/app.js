@@ -28,6 +28,47 @@ const app = createApp({
     const aiLoading = ref(false);
     const showColumnMenu = ref(false);
 
+    // ---- Undo/Redo ----
+    const undoStack = [];
+    const redoStack = [];
+    const maxUndoSteps = 50;
+    let undoLocked = false; // prevent pushUndo during undo/redo itself
+
+    function cloneState() {
+      return JSON.parse(JSON.stringify({ tasks: project.tasks, resources: project.resources }));
+    }
+
+    function pushUndo() {
+      if (undoLocked) return;
+      undoStack.push(cloneState());
+      if (undoStack.length > maxUndoSteps) undoStack.shift();
+      redoStack.length = 0; // clear redo on new action
+    }
+
+    function undo() {
+      if (undoStack.length === 0) { toast('Nada que deshacer', 'info'); return; }
+      redoStack.push(cloneState());
+      const state = undoStack.pop();
+      undoLocked = true;
+      project.tasks = state.tasks;
+      project.resources = state.resources;
+      recalculate();
+      undoLocked = false;
+      toast('Deshacer', 'info');
+    }
+
+    function redo() {
+      if (redoStack.length === 0) { toast('Nada que rehacer', 'info'); return; }
+      undoStack.push(cloneState());
+      const state = redoStack.pop();
+      undoLocked = true;
+      project.tasks = state.tasks;
+      project.resources = state.resources;
+      recalculate();
+      undoLocked = false;
+      toast('Rehacer', 'info');
+    }
+
     // ---- AI Project Generator ----
     const showGenerateModal = ref(false);
     const generateLoading = ref(false);
@@ -225,6 +266,7 @@ const app = createApp({
 
     // Task CRUD
     function addTask(parentId = null) {
+      pushUndo();
       const task = DataModel.createTask({
         parentId,
         name: 'Nueva Tarea',
@@ -236,6 +278,7 @@ const app = createApp({
     }
 
     function addMilestone() {
+      pushUndo();
       const task = DataModel.createTask({
         name: 'Nuevo Hito',
         duration: 0,
@@ -247,6 +290,7 @@ const app = createApp({
     }
 
     function deleteTask(taskId) {
+      pushUndo();
       // Eliminar descendientes
       const descendants = DataModel.getDescendants(project.tasks, taskId);
       const idsToRemove = new Set([taskId, ...descendants.map(d => d.id)]);
@@ -262,6 +306,7 @@ const app = createApp({
     }
 
     function indentTask(taskId) {
+      pushUndo();
       const idx = project.tasks.findIndex(t => t.id === taskId);
       if (idx <= 0) return;
       // Buscar tarea anterior al mismo nivel o superior
@@ -278,6 +323,7 @@ const app = createApp({
     }
 
     function outdentTask(taskId) {
+      pushUndo();
       const task = project.tasks.find(t => t.id === taskId);
       if (!task || !task.parentId) return;
       const parent = project.tasks.find(t => t.id === task.parentId);
@@ -291,6 +337,7 @@ const app = createApp({
     }
 
     function moveTaskUp(taskId) {
+      pushUndo();
       const idx = project.tasks.findIndex(t => t.id === taskId);
       if (idx <= 0) return;
       const task = project.tasks[idx];
@@ -305,6 +352,7 @@ const app = createApp({
     }
 
     function moveTaskDown(taskId) {
+      pushUndo();
       const idx = project.tasks.findIndex(t => t.id === taskId);
       if (idx >= project.tasks.length - 1) return;
       const task = project.tasks[idx];
@@ -339,6 +387,7 @@ const app = createApp({
 
     // Inline editing handlers
     function onTaskFieldChange(task, field, value) {
+      pushUndo();
       if (field === 'duration') {
         task.duration = parseInt(value) || 0;
         if (task.duration === 0) task.isMilestone = true;
@@ -956,6 +1005,47 @@ const app = createApp({
       driverObj.drive();
     }
 
+    // ---- Keyboard Shortcuts ----
+    function onTableKeydown(e) {
+      const tr = e.target.closest('tr[data-task-id]');
+      if (!tr) return;
+      const taskId = tr.dataset.taskId;
+
+      // Tab / Shift+Tab → indent / outdent
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          outdentTask(taskId);
+        } else {
+          indentTask(taskId);
+        }
+        // Re-focus the same input after Vue re-renders
+        nextTick(() => {
+          const newTr = document.querySelector(`tr[data-task-id="${taskId}"]`);
+          if (newTr) {
+            const input = newTr.querySelector('input');
+            if (input) input.focus();
+          }
+        });
+        return;
+      }
+
+      // Alt+ArrowUp / Alt+ArrowDown → move task up/down
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        if (e.key === 'ArrowUp') moveTaskUp(taskId);
+        else moveTaskDown(taskId);
+        nextTick(() => {
+          const newTr = document.querySelector(`tr[data-task-id="${taskId}"]`);
+          if (newTr) {
+            const input = newTr.querySelector('input');
+            if (input) input.focus();
+          }
+        });
+        return;
+      }
+    }
+
     // Init
     onMounted(() => {
       loadColumnVisibility();
@@ -965,6 +1055,26 @@ const app = createApp({
         toast('Proyecto cargado desde guardado local', 'info');
       }
       document.addEventListener('click', () => { showColumnMenu.value = false; });
+
+      // Global keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+        const mod = isMac ? e.metaKey : e.ctrlKey;
+
+        // Ctrl/Cmd+Z → Undo
+        if (mod && e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+          return;
+        }
+        // Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z → Redo
+        if ((mod && e.key === 'y') || (mod && e.key === 'z' && e.shiftKey)) {
+          e.preventDefault();
+          redo();
+          return;
+        }
+      });
+
       nextTick(() => {
         if (!localStorage.getItem('pmi-gantt-tour-done')) {
           startOnboardingTour();
@@ -1087,6 +1197,8 @@ const app = createApp({
       generateProjectWithAI, applyGeneratedProject,
       // Onboarding
       startOnboardingTour,
+      // Keyboard & Undo/Redo
+      onTableKeydown, undo, redo,
       // Helpers
       EVMEngine,
     };

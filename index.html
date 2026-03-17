@@ -331,7 +331,7 @@
           </div>
 
           <div class="task-table-wrapper">
-            <table class="task-table">
+            <table class="task-table" @keydown="onTableKeydown">
               <thead>
                 <tr>
                   <th style="width:30px">#</th>
@@ -353,6 +353,7 @@
               </thead>
               <tbody>
                 <tr v-for="task in orderedTasks" :key="task.id"
+                    :data-task-id="task.id"
                     :class="{critical: task.isCritical && !task.isSummary, summary: task.isSummary}">
                   <td>{{ getTaskRowNumber(task) }}</td>
                   <td v-show="columnVisibility.wbs"><span class="wbs-code">{{ task.wbsCode }}</span></td>
