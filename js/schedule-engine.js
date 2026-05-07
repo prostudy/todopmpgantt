@@ -89,8 +89,6 @@ const ScheduleEngine = {
    * LS = LF - duracion
    */
   backwardPass(sortedTasks, project) {
-    const taskMap = new Map(project.tasks.map(t => [t.id, t]));
-
     // Encontrar el EF maximo del proyecto
     const maxEF = Math.max(...sortedTasks.filter(t => !t.isSummary).map(t => t.earlyFinish ?? 0));
 
@@ -145,16 +143,14 @@ const ScheduleEngine = {
    * Calcula holgura total, holgura libre y ruta critica
    */
   calculateFloats(tasks) {
-    const taskMap = new Map(tasks.map(t => [t.id, t]));
-
-    // Construir mapa de sucesores
+    // Construir mapa de sucesores con tipo y lag
     const successorMap = new Map();
     for (const task of tasks) {
       for (const pred of task.predecessors) {
         if (!successorMap.has(pred.taskId)) {
           successorMap.set(pred.taskId, []);
         }
-        successorMap.get(pred.taskId).push(task);
+        successorMap.get(pred.taskId).push({ succTask: task, type: pred.type || 'FS', lag: pred.lag || 0 });
       }
     }
 
@@ -171,11 +167,21 @@ const ScheduleEngine = {
       // Holgura Total = LS - ES (o LF - EF)
       task.totalFloat = (task.lateStart ?? 0) - (task.earlyStart ?? 0);
 
-      // Holgura Libre = min(ES de sucesores) - EF
+      // Holgura Libre segun tipo de dependencia y lag
       const successors = successorMap.get(task.id);
       if (successors && successors.length > 0) {
-        const minSuccES = Math.min(...successors.map(s => s.earlyStart ?? 0));
-        task.freeFloat = minSuccES - (task.earlyFinish ?? 0);
+        let minFF = Infinity;
+        for (const succ of successors) {
+          let ff;
+          switch (succ.type) {
+            case 'FF': ff = (succ.succTask.earlyFinish ?? 0) - (task.earlyFinish ?? 0) - succ.lag; break;
+            case 'SS': ff = (succ.succTask.earlyStart ?? 0) - (task.earlyStart ?? 0) - succ.lag; break;
+            case 'SF': ff = (succ.succTask.earlyFinish ?? 0) - (task.earlyStart ?? 0) - succ.lag; break;
+            default:   ff = (succ.succTask.earlyStart ?? 0) - (task.earlyFinish ?? 0) - succ.lag;
+          }
+          minFF = Math.min(minFF, ff);
+        }
+        task.freeFloat = minFF;
       } else {
         task.freeFloat = task.totalFloat;
       }
@@ -195,7 +201,6 @@ const ScheduleEngine = {
     for (const task of tasks) {
       if (task.isSummary) {
         // Resumen: fechas de min/max de sub-tareas
-        const children = tasks.filter(t => t.parentId === task.id);
         const leafDescendants = this.getLeafDescendants(tasks, task.id);
         if (leafDescendants.length > 0) {
           const starts = leafDescendants.filter(c => c.startDate).map(c => new Date(c.startDate));
@@ -263,11 +268,11 @@ const ScheduleEngine = {
   getWorkdaysBetween(start, end, calendarWorkdays) {
     let count = 0;
     const current = new Date(start);
-    while (current < end) {
-      current.setDate(current.getDate() + 1);
+    while (current <= end) {
       if (calendarWorkdays.includes(current.getDay())) {
         count++;
       }
+      current.setDate(current.getDate() + 1);
     }
     return count;
   },

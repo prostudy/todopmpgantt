@@ -595,12 +595,12 @@
               <div class="metric-desc">Costo Real</div>
             </div>
 
-            <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SV, 'SV')">
+            <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SV, 'SV', evmMetrics.BAC)">
               <div class="metric-label">SV</div>
               <div class="metric-value">${{ evmMetrics.SV.toLocaleString() }}</div>
               <div class="metric-desc">Varianza Cronograma</div>
             </div>
-            <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CV, 'CV')">
+            <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CV, 'CV', evmMetrics.BAC)">
               <div class="metric-label">CV</div>
               <div class="metric-value">${{ evmMetrics.CV.toLocaleString() }}</div>
               <div class="metric-desc">Varianza Costo</div>

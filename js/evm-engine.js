@@ -33,11 +33,11 @@ const EVMEngine = {
     const CV = EV - AC;  // Cost Variance
 
     // Indices de desempeno
-    const SPI = PV !== 0 ? EV / PV : 0;  // Schedule Performance Index
-    const CPI = AC !== 0 ? EV / AC : 0;  // Cost Performance Index
+    const SPI = PV !== 0 ? EV / PV : 1;  // Schedule Performance Index
+    const CPI = AC !== 0 ? EV / AC : 1;  // Cost Performance Index
 
     // Estimaciones a completar
-    const EAC = CPI !== 0 ? BAC / CPI : BAC;  // Estimate at Completion
+    const EAC = BAC / CPI;  // Estimate at Completion
     const ETC = EAC - AC;  // Estimate to Complete
     const VAC = BAC - EAC; // Variance at Completion
 
@@ -90,10 +90,10 @@ const EVMEngine = {
         // Tarea completamente pasada
         pv += cost;
       } else if (statusDate > start) {
-        // Tarea parcialmente en progreso - distribucion lineal
-        const totalDays = Math.max(1, (end - start) / (1000 * 60 * 60 * 24));
-        const elapsedDays = (statusDate - start) / (1000 * 60 * 60 * 24);
-        pv += cost * (elapsedDays / totalDays);
+        // Tarea parcialmente en progreso - distribucion lineal por dias laborables
+        const totalWorkdays = Math.max(1, ScheduleEngine.getWorkdaysBetween(start, end, project.calendarWorkdays));
+        const elapsedWorkdays = ScheduleEngine.getWorkdaysBetween(start, statusDate, project.calendarWorkdays);
+        pv += cost * (elapsedWorkdays / totalWorkdays);
       }
       // Si statusDate <= start, PV = 0 para esta tarea
     }
@@ -142,8 +142,8 @@ const EVMEngine = {
         if (current >= end) {
           pv += cost;
         } else if (current > start) {
-          const total = Math.max(1, (end - start) / (1000 * 60 * 60 * 24));
-          const elapsed = (current - start) / (1000 * 60 * 60 * 24);
+          const total = Math.max(1, ScheduleEngine.getWorkdaysBetween(start, end, project.calendarWorkdays));
+          const elapsed = ScheduleEngine.getWorkdaysBetween(start, current, project.calendarWorkdays);
           pv += cost * (elapsed / total);
         }
       }
@@ -177,7 +177,7 @@ const EVMEngine = {
   /**
    * Determina el estado semaforo de una metrica
    */
-  getStatus(value, type) {
+  getStatus(value, type, bac = 0) {
     switch (type) {
       case 'SPI':
       case 'CPI':
@@ -187,7 +187,7 @@ const EVMEngine = {
       case 'SV':
       case 'CV':
         if (value >= 0) return 'green';
-        if (value >= -Math.abs(value * 0.1)) return 'yellow';
+        if (bac > 0 && value >= -bac * 0.05) return 'yellow';
         return 'red';
       default:
         return 'gray';
