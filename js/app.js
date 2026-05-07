@@ -27,6 +27,7 @@ const app = createApp({
     const aiAnalysisHTML = ref('');
     const aiLoading = ref(false);
     const showColumnMenu = ref(false);
+    const showVerifyModal = ref(false);
 
     // ---- Undo/Redo ----
     const undoStack = [];
@@ -1219,11 +1220,49 @@ const app = createApp({
       toast('Proyecto demo cargado', 'success');
     }
 
+    // Proyecto de verificacion manual: numeros redondos, calcula a mano
+    function loadVerificationDemo() {
+      if (project.tasks.length > 0 && !confirm('Se reemplazara el proyecto actual. Continuar?')) return;
+
+      Object.assign(project, DataModel.createProject({
+        name: 'Verificacion EVM — Lanzamiento de Producto',
+        startDate: '2026-06-01',
+        statusDate: '2026-06-12',
+        hoursPerDay: 8,
+      }));
+      project.resources = [];
+
+      const t1 = DataModel.createTask({ name: 'Investigacion de mercado', duration: 2, plannedCost: 2000, actualCost: 2000, percentComplete: 100,
+        notes: 'PV=$2,000  EV=$2,000  AC=$2,000  — en tiempo y presupuesto' });
+      const t2 = DataModel.createTask({ name: 'Desarrollo del producto',  duration: 3, plannedCost: 3000, actualCost: 3000, percentComplete: 100,
+        notes: 'PV=$3,000  EV=$3,000  AC=$3,000  — en tiempo y presupuesto' });
+      const t3 = DataModel.createTask({ name: 'Produccion y fabricacion', duration: 5, plannedCost: 5000, actualCost: 7000, percentComplete: 100,
+        notes: 'PV=$5,000  EV=$5,000  AC=$7,000  — SOBRECOSTO $2,000 (falla en maquinaria)' });
+      const t4 = DataModel.createTask({ name: 'Campana de marketing',     duration: 3, plannedCost: 3000, actualCost: 0,    percentComplete: 0,
+        notes: 'PV=$0 (futuro)  EV=$0  AC=$0  — pendiente' });
+      const t5 = DataModel.createTask({ name: 'Lanzamiento oficial',      duration: 2, plannedCost: 2000, actualCost: 0,    percentComplete: 0,
+        notes: 'PV=$0 (futuro)  EV=$0  AC=$0  — pendiente' });
+
+      t2.predecessors = [{ taskId: t1.id, type: 'FS', lag: 0 }];
+      t3.predecessors = [{ taskId: t2.id, type: 'FS', lag: 0 }];
+      t4.predecessors = [{ taskId: t3.id, type: 'FS', lag: 0 }];
+      t5.predecessors = [{ taskId: t4.id, type: 'FS', lag: 0 }];
+
+      project.tasks = [t1, t2, t3, t4, t5];
+
+      recalculate();
+      const bl = DataModel.createBaseline(project, 'Linea Base Original');
+      project.baselines = [bl];
+      recalculate();
+      showVerifyModal.value = true;
+      toast('Demo de verificacion cargado — revisa la pestana EVM', 'success');
+    }
+
     return {
       // State
       activeTab, project, ganttScale, ganttSvg, evmMetrics, evmInterpretations,
       overallocations, toasts, showConfigModal, showTaskModal, editingTask,
-      showResourceModal, editingResource, showAssignModal, assigningTask,
+      showResourceModal, editingResource, showAssignModal, assigningTask, showVerifyModal,
       // Column Visibility
       columnVisibility, showColumnMenu, columnLabels, columnPresets,
       applyColumnPreset, visibleColumnCount,
@@ -1240,7 +1279,7 @@ const app = createApp({
       toggleResourceAssignment, updateAssignmentUnits, getResourceNames,
       saveBaseline, deleteBaseline, setActiveBaseline, levelResources,
       exportTasksCSV, exportResourcesCSV, exportEVMCSV, exportProjectJSON,
-      importCSV, importResourcesCSV, exportGanttImage, loadDemo,
+      importCSV, importResourcesCSV, exportGanttImage, loadDemo, loadVerificationDemo,
       showAIModal, aiAnalysisHTML, aiLoading, analyzeWithAI,
       // AI Generator
       showGenerateModal, generateLoading, generateDescription, generateStatus, generatePreview,

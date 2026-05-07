@@ -247,7 +247,9 @@
       <div class="toolbar-separator"></div>
 
       <button class="btn btn-toolbar" @click="newProject">Nuevo</button>
-      <button class="btn btn-toolbar" @click="loadDemo">Demo</button>
+      <button class="btn btn-toolbar" @click="loadDemo">Ejemplo complejo</button>
+      <button class="btn btn-toolbar" @click="loadVerificationDemo" title="Proyecto con numeros redondos para verificar EVM a mano">Ejemplo simple</button>
+      <button class="btn btn-toolbar" @click="showVerifyModal = true" title="Ver tabla de verificacion EVM paso a paso" style="padding:0 6px;font-size:14px">?</button>
       <div class="toolbar-separator"></div>
 
       <label class="btn btn-toolbar" style="cursor:pointer">
@@ -984,6 +986,157 @@
     </div>
   </div>
 
+  <!-- Modal: Verificacion EVM paso a paso -->
+  <div class="modal-overlay" v-if="showVerifyModal" @click.self="showVerifyModal = false">
+    <div class="modal" style="max-width:680px;max-height:90vh;overflow-y:auto">
+      <h3 style="margin-bottom:4px">Verificacion EVM — Lanzamiento de Producto</h3>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">
+        Inicio: 1 jun 2026 &nbsp;·&nbsp; Fecha de estado: 12 jun 2026 &nbsp;·&nbsp; Todas las tareas en serie (FS)
+      </p>
+
+      <!-- Tabla de tareas -->
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">
+        <thead>
+          <tr style="background:var(--bg-secondary)">
+            <th style="padding:6px 8px;text-align:left;border:1px solid var(--border)">#</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid var(--border)">Tarea</th>
+            <th style="padding:6px 8px;text-align:center;border:1px solid var(--border)">Días</th>
+            <th style="padding:6px 8px;text-align:right;border:1px solid var(--border)">Plan</th>
+            <th style="padding:6px 8px;text-align:right;border:1px solid var(--border)">Real</th>
+            <th style="padding:6px 8px;text-align:center;border:1px solid var(--border)">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border)">1</td>
+            <td style="padding:5px 8px;border:1px solid var(--border)">Investigacion de mercado</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border)">2</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$2,000</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$2,000</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border);color:#16a34a">100%</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border)">2</td>
+            <td style="padding:5px 8px;border:1px solid var(--border)">Desarrollo del producto</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border)">3</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$3,000</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$3,000</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border);color:#16a34a">100%</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border)">3</td>
+            <td style="padding:5px 8px;border:1px solid var(--border)">Produccion y fabricacion</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border)">5</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$5,000</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border);color:#dc2626;font-weight:600">$7,000</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border);color:#16a34a">100%</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border)">4</td>
+            <td style="padding:5px 8px;border:1px solid var(--border)">Campana de marketing</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border)">3</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$3,000</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border);color:var(--text-secondary)">—</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border);color:var(--text-secondary)">0%</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border)">5</td>
+            <td style="padding:5px 8px;border:1px solid var(--border)">Lanzamiento oficial</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border)">2</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border)">$2,000</td>
+            <td style="padding:5px 8px;text-align:right;border:1px solid var(--border);color:var(--text-secondary)">—</td>
+            <td style="padding:5px 8px;text-align:center;border:1px solid var(--border);color:var(--text-secondary)">0%</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Tabla de metricas EVM -->
+      <h4 style="margin-bottom:8px;font-size:13px">Verificacion a mano — paso a paso</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:18px">
+        <thead>
+          <tr style="background:var(--bg-secondary)">
+            <th style="padding:6px 8px;text-align:left;border:1px solid var(--border);width:60px">Metrica</th>
+            <th style="padding:6px 8px;text-align:left;border:1px solid var(--border)">Calculo</th>
+            <th style="padding:6px 8px;text-align:right;border:1px solid var(--border);width:130px">Resultado</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">BAC</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">2+3+5+3+2 (× $1k)</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$15,000</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">PV</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">T1+T2+T3 al 12-jun</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$10,000</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">EV</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">100%×$2k + 100%×$3k + 100%×$5k</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$10,000</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">AC</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$2k + $3k + $7k</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$12,000</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">SV</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$10,000 − $10,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#16a34a">$0 &nbsp;✓ en tiempo</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">CV</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$10,000 − $12,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#dc2626">−$2,000 &nbsp;✗</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">SPI</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$10,000 ÷ $10,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#16a34a">1.000</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">CPI</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$10,000 ÷ $12,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#dc2626">0.833</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">EAC</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$15,000 ÷ 0.833</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$18,000</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">ETC</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$18,000 − $12,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600">$6,000</td>
+          </tr>
+          <tr>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">VAC</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">$15,000 − $18,000</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#dc2626">−$3,000</td>
+          </tr>
+          <tr style="background:var(--bg-secondary)">
+            <td style="padding:5px 8px;border:1px solid var(--border);font-weight:600">TCPI</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);font-family:monospace">($15k−$10k) ÷ ($15k−$12k) = $5k÷$3k</td>
+            <td style="padding:5px 8px;border:1px solid var(--border);text-align:right;font-weight:600;color:#dc2626">1.667</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:12px;color:var(--text-secondary);border-left:3px solid var(--border);padding-left:10px;margin-bottom:16px">
+        <strong>La historia:</strong> El proyecto entrego las 3 primeras fases a tiempo (SPI=1.0), pero Produccion costo $7,000 en vez de $5,000 (falla en maquinaria). Si el equipo mantiene ese ritmo de gasto, el costo final sera $18,000 en vez de $15,000. El TCPI=1.667 significa que para terminar en presupuesto se tendria que gastar $1.67 de valor por cada $1.00 real — practicamente imposible.
+      </p>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">
+        <strong>Ruta critica:</strong> Todas las tareas son FS en serie → holgura = 0 → aparecen en rojo. Duracion total: 2+3+5+3+2 = <strong>15 dias laborables</strong>.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" @click="showVerifyModal = false">Entendido</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toasts -->
   <div class="toast-container">
     <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.message }}</div>
@@ -992,13 +1145,13 @@
 
 <!-- ===== SCRIPTS ===== -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="js/data-model.js"></script>
-<script src="js/schedule-engine.js"></script>
-<script src="js/evm-engine.js"></script>
-<script src="js/resource-engine.js"></script>
-<script src="js/csv-manager.js"></script>
-<script src="js/gantt-renderer.js"></script>
-<script src="js/app.js?v=1.6"></script>
+<script src="js/data-model.js?v=1.7"></script>
+<script src="js/schedule-engine.js?v=1.7"></script>
+<script src="js/evm-engine.js?v=1.7"></script>
+<script src="js/resource-engine.js?v=1.7"></script>
+<script src="js/csv-manager.js?v=1.7"></script>
+<script src="js/gantt-renderer.js?v=1.7"></script>
+<script src="js/app.js?v=1.8"></script>
 
 </body>
 </html>
