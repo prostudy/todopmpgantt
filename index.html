@@ -163,7 +163,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/styles.css?v=1.6">
+  <link rel="stylesheet" href="css/styles.css?v=1.7">
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.3.1/dist/driver.css"/>
@@ -366,7 +366,11 @@
                         {{ task.collapsed ? '+' : '-' }}
                       </button>
                       <span v-if="task.isMilestone" style="color:#f97316;margin-right:2px">&#9670;</span>
-                      <input :value="task.name" data-field="name" @change="onTaskFieldChange(task, 'name', $event.target.value)"
+                      <input :value="editingName.taskId === task.id ? editingName.value : task.name"
+                             data-field="name"
+                             @focus="editingName.taskId = task.id; editingName.value = task.name; $event.target.select()"
+                             @input="editingName.value = $event.target.value"
+                             @change="onTaskFieldChange(task, 'name', $event.target.value); editingName.taskId = null"
                              :style="{fontWeight: task.isSummary ? 'bold' : 'normal'}"
                              style="min-width:150px">
                     </div>
@@ -580,63 +584,133 @@
               <div class="metric-label">BAC</div>
               <div class="metric-value">${{ evmMetrics.BAC.toLocaleString() }}</div>
               <div class="metric-desc">Presupuesto Total</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">BAC = Σ Costos Planificados</div>
+                <div class="ft-result">= ${{ evmMetrics.BAC.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
               <div class="metric-label">PV</div>
               <div class="metric-value">${{ evmMetrics.PV.toLocaleString() }}</div>
               <div class="metric-desc">Valor Planificado</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">PV = Σ (costo × % tiempo a la fecha)</div>
+                <div class="ft-sub">Fecha de estado: {{ project.statusDate }}</div>
+                <div class="ft-result">= ${{ evmMetrics.PV.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
               <div class="metric-label">EV</div>
               <div class="metric-value">${{ evmMetrics.EV.toLocaleString() }}</div>
               <div class="metric-desc">Valor Ganado</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">EV = Σ (% avance × Costo Plan.)</div>
+                <div class="ft-result">= ${{ evmMetrics.EV.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CPI, 'CPI')">
               <div class="metric-label">AC</div>
               <div class="metric-value">${{ evmMetrics.AC.toLocaleString() }}</div>
               <div class="metric-desc">Costo Real</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">AC = Σ Costos Reales</div>
+                <div class="ft-result">= ${{ evmMetrics.AC.toLocaleString() }}</div>
+              </div>
             </div>
 
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SV, 'SV', evmMetrics.BAC)">
               <div class="metric-label">SV</div>
               <div class="metric-value">${{ evmMetrics.SV.toLocaleString() }}</div>
               <div class="metric-desc">Varianza Cronograma</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">SV = EV − PV</div>
+                <div class="ft-sub">= ${{ evmMetrics.EV.toLocaleString() }} − ${{ evmMetrics.PV.toLocaleString() }}</div>
+                <div class="ft-result">= ${{ evmMetrics.SV.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CV, 'CV', evmMetrics.BAC)">
               <div class="metric-label">CV</div>
               <div class="metric-value">${{ evmMetrics.CV.toLocaleString() }}</div>
               <div class="metric-desc">Varianza Costo</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">CV = EV − AC</div>
+                <div class="ft-sub">= ${{ evmMetrics.EV.toLocaleString() }} − ${{ evmMetrics.AC.toLocaleString() }}</div>
+                <div class="ft-result">= ${{ evmMetrics.CV.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.SPI, 'SPI')">
               <div class="metric-label">SPI</div>
               <div class="metric-value">{{ evmMetrics.SPI }}</div>
               <div class="metric-desc">Indice Cronograma</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">SPI = EV / PV</div>
+                <div class="ft-sub">= ${{ evmMetrics.EV.toLocaleString() }} / ${{ evmMetrics.PV.toLocaleString() }}</div>
+                <div class="ft-result">= {{ evmMetrics.SPI }}</div>
+              </div>
             </div>
             <div class="evm-card" :class="'status-' + EVMEngine.getStatus(evmMetrics.CPI, 'CPI')">
               <div class="metric-label">CPI</div>
               <div class="metric-value">{{ evmMetrics.CPI }}</div>
               <div class="metric-desc">Indice Costo</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">CPI = EV / AC</div>
+                <div class="ft-sub">= ${{ evmMetrics.EV.toLocaleString() }} / ${{ evmMetrics.AC.toLocaleString() }}</div>
+                <div class="ft-result">= {{ evmMetrics.CPI }}</div>
+              </div>
             </div>
 
             <div class="evm-card status-gray">
               <div class="metric-label">EAC</div>
               <div class="metric-value">${{ evmMetrics.EAC.toLocaleString() }}</div>
               <div class="metric-desc">Estimado Conclusion</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">EAC = BAC / CPI</div>
+                <div class="ft-sub">= ${{ evmMetrics.BAC.toLocaleString() }} / {{ evmMetrics.CPI }}</div>
+                <div class="ft-result">= ${{ evmMetrics.EAC.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card status-gray">
               <div class="metric-label">ETC</div>
               <div class="metric-value">${{ evmMetrics.ETC.toLocaleString() }}</div>
               <div class="metric-desc">Estimado para Completar</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">ETC = EAC − AC</div>
+                <div class="ft-sub">= ${{ evmMetrics.EAC.toLocaleString() }} − ${{ evmMetrics.AC.toLocaleString() }}</div>
+                <div class="ft-result">= ${{ evmMetrics.ETC.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card status-gray">
               <div class="metric-label">VAC</div>
               <div class="metric-value">${{ evmMetrics.VAC.toLocaleString() }}</div>
               <div class="metric-desc">Varianza Conclusion</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">VAC = BAC − EAC</div>
+                <div class="ft-sub">= ${{ evmMetrics.BAC.toLocaleString() }} − ${{ evmMetrics.EAC.toLocaleString() }}</div>
+                <div class="ft-result">= ${{ evmMetrics.VAC.toLocaleString() }}</div>
+              </div>
             </div>
             <div class="evm-card status-gray">
               <div class="metric-label">TCPI</div>
-              <div class="metric-value">{{ evmMetrics.TCPI_BAC }}</div>
+              <div class="metric-value">{{ evmMetrics.TCPI_BAC != null ? evmMetrics.TCPI_BAC : '—' }}</div>
               <div class="metric-desc">Indice Para Completar</div>
+              <div class="evm-formula-tip">
+                <div class="ft-label">Fórmula</div>
+                <div class="ft-formula">TCPI = (BAC − EV) / (BAC − AC)</div>
+                <div class="ft-sub">= (${{ evmMetrics.BAC.toLocaleString() }} − ${{ evmMetrics.EV.toLocaleString() }})</div>
+                <div class="ft-sub">  / (${{ evmMetrics.BAC.toLocaleString() }} − ${{ evmMetrics.AC.toLocaleString() }})</div>
+                <div class="ft-result">= {{ evmMetrics.TCPI_BAC != null ? evmMetrics.TCPI_BAC : '—' }}</div>
+              </div>
             </div>
           </div>
 
@@ -1145,13 +1219,13 @@
 
 <!-- ===== SCRIPTS ===== -->
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="js/data-model.js?v=1.7"></script>
-<script src="js/schedule-engine.js?v=1.7"></script>
-<script src="js/evm-engine.js?v=1.7"></script>
-<script src="js/resource-engine.js?v=1.7"></script>
-<script src="js/csv-manager.js?v=1.7"></script>
-<script src="js/gantt-renderer.js?v=1.7"></script>
-<script src="js/app.js?v=1.8"></script>
+<script src="js/data-model.js?v=1.9"></script>
+<script src="js/schedule-engine.js?v=1.9"></script>
+<script src="js/evm-engine.js?v=1.9"></script>
+<script src="js/resource-engine.js?v=1.9"></script>
+<script src="js/csv-manager.js?v=1.9"></script>
+<script src="js/gantt-renderer.js?v=1.9"></script>
+<script src="js/app.js?v=1.10"></script>
 
 </body>
 </html>

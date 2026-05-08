@@ -203,11 +203,11 @@ const ScheduleEngine = {
         // Resumen: fechas de min/max de sub-tareas
         const leafDescendants = this.getLeafDescendants(tasks, task.id);
         if (leafDescendants.length > 0) {
-          const starts = leafDescendants.filter(c => c.startDate).map(c => new Date(c.startDate));
-          const ends = leafDescendants.filter(c => c.endDate).map(c => new Date(c.endDate));
+          const starts = leafDescendants.filter(c => c.startDate).map(c => new Date(c.startDate + 'T00:00:00'));
+          const ends = leafDescendants.filter(c => c.endDate).map(c => new Date(c.endDate + 'T00:00:00'));
           if (starts.length > 0) task.startDate = new Date(Math.min(...starts)).toISOString().split('T')[0];
           if (ends.length > 0) task.endDate = new Date(Math.max(...ends)).toISOString().split('T')[0];
-          task.duration = this.getWorkdaysBetween(new Date(task.startDate), new Date(task.endDate), workdays);
+          task.duration = this.getWorkdaysBetween(new Date(task.startDate + 'T00:00:00'), new Date(task.endDate + 'T00:00:00'), workdays);
         }
         continue;
       }
@@ -341,10 +341,11 @@ const ScheduleEngine = {
           const descendants = tasks.filter(t => t.parentId === child.id);
           child.plannedCost = descendants.reduce((s, d) => s + (d.plannedCost || 0), 0);
           child.actualCost = descendants.reduce((s, d) => s + (d.actualCost || 0), 0);
-          // Calcular % completado ponderado por duracion
-          const totalDur = descendants.reduce((s, d) => s + (d.duration || 0), 0);
+          // % completado ponderado por duracion usando solo tareas hoja (evita pesos 0 en sub-resúmenes)
+          const leaves = this.getLeafDescendants(tasks, child.id);
+          const totalDur = leaves.reduce((s, d) => s + (d.duration || 0), 0);
           child.percentComplete = totalDur > 0
-            ? Math.round(descendants.reduce((s, d) => s + (d.percentComplete || 0) * (d.duration || 0), 0) / totalDur)
+            ? Math.round(leaves.reduce((s, d) => s + (d.percentComplete || 0) * (d.duration || 0), 0) / totalDur)
             : 0;
         }
       }
@@ -371,7 +372,7 @@ const ScheduleEngine = {
         // Buscar tarea por numero de fila (indice + 1)
         if (rowNum >= 1 && rowNum <= tasks.length) {
           const targetTask = tasks[rowNum - 1];
-          if (targetTask) {
+          if (targetTask && !targetTask.isSummary) {
             result.push({ taskId: targetTask.id, type, lag });
           }
         }

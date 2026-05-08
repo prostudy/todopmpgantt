@@ -1082,12 +1082,70 @@ body {
   text-align: center;
   transition: box-shadow var(--transition), transform var(--transition);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+}
+
+/* Tooltip de fórmula EVM */
+.evm-formula-tip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+  text-align: left;
+  min-width: 210px;
+}
+.evm-formula-tip::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: #1e293b;
+}
+.evm-card:hover .evm-formula-tip { display: block; }
+
+.evm-formula-tip .ft-label {
+  color: #94a3b8;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 4px;
+}
+.evm-formula-tip .ft-formula {
+  color: #7dd3fc;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.evm-formula-tip .ft-sub {
+  color: #cbd5e1;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.6;
+}
+.evm-formula-tip .ft-result {
+  color: #4ade80;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  border-top: 1px solid #334155;
+  margin-top: 6px;
+  padding-top: 6px;
 }
 
 .evm-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+  z-index: 1000; /* eleva el stacking context para que el tooltip no quede debajo de otros elementos */
 }
 
 .evm-card .metric-label {

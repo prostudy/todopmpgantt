@@ -27,6 +27,7 @@ const app = createApp({
     const aiAnalysisHTML = ref('');
     const aiLoading = ref(false);
     const showColumnMenu = ref(false);
+    const editingName = reactive({ taskId: null, value: '' });
     const showVerifyModal = ref(false);
 
     // ---- Undo/Redo ----
@@ -143,13 +144,14 @@ const app = createApp({
     );
 
     const projectEndDate = computed(() => {
-      const dates = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate));
+      const dates = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate + 'T00:00:00'));
       if (dates.length === 0) return '-';
-      return new Date(Math.max(...dates)).toISOString().split('T')[0];
+      const d = new Date(Math.max(...dates));
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     });
 
     const projectDurationDays = computed(() => {
-      const ends = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate));
+      const ends = project.tasks.filter(t => t.endDate).map(t => new Date(t.endDate + 'T00:00:00'));
       if (ends.length === 0) return 0;
       const start = new Date(project.startDate + 'T00:00:00');
       const end = new Date(Math.max(...ends));
@@ -189,6 +191,7 @@ const app = createApp({
       for (const task of project.tasks) {
         if (task.isSummary) continue;
         if (task.resourceAssignments.length === 0) continue;
+        if (task.costOverride) continue; // el usuario ingresó un costo manual
         const cost = ResourceEngine.calculateTaskResourceCost(task, project);
         task.plannedCost = Math.round(cost * 100) / 100;
       }
@@ -379,6 +382,11 @@ const app = createApp({
     function saveTaskEdit() {
       const idx = project.tasks.findIndex(t => t.id === editingTask.value.id);
       if (idx >= 0) {
+        pushUndo();
+        // Si el usuario cambió plannedCost manualmente, marcar como override
+        if (editingTask.value.plannedCost !== project.tasks[idx].plannedCost) {
+          editingTask.value.costOverride = true;
+        }
         Object.assign(project.tasks[idx], editingTask.value);
       }
       showTaskModal.value = false;
@@ -401,6 +409,7 @@ const app = createApp({
         else task.isMilestone = false;
       } else if (field === 'plannedCost' || field === 'actualCost') {
         task[field] = parseFloat(value) || 0;
+        if (field === 'plannedCost') task.costOverride = true;
       } else if (field === 'percentComplete') {
         task[field] = Math.min(100, Math.max(0, parseInt(value) || 0));
       } else if (field === 'predecessors') {
@@ -666,13 +675,21 @@ const app = createApp({
       if (data.labels.length === 0) return '';
 
       const w = 700, h = 300, pad = 50;
-      const maxVal = Math.max(...data.pv, ...data.ev, ...data.ac, 1);
+      const maxVal = Math.max(...data.pv, ...data.ev.filter(v => v !== null), ...data.ac.filter(v => v !== null), 1);
       const xScale = (w - pad * 2) / Math.max(data.labels.length - 1, 1);
       const yScale = (h - pad * 2) / maxVal;
 
       const line = (points) => {
         if (points.length === 0) return '';
-        return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${pad + i * xScale},${h - pad - p * yScale}`).join(' ');
+        let d = '';
+        points.forEach((p, i) => {
+          if (p === null) return;
+          const x = pad + i * xScale;
+          const y = h - pad - p * yScale;
+          // Si el punto anterior era null, comenzar nuevo subpath
+          d += (d === '' || points[i - 1] === null) ? `M${x},${y}` : `L${x},${y}`;
+        });
+        return d;
       };
 
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" style="width:100%;max-width:${w}px">`;
@@ -1273,7 +1290,7 @@ const app = createApp({
       toast, newProject, recalculate, updateGantt, updateEVM,
       addTask, addMilestone, deleteTask, indentTask, outdentTask,
       moveTaskUp, moveTaskDown, toggleCollapse,
-      openTaskEdit, saveTaskEdit, onTaskFieldChange, getPredecessorString, getTaskRowNumber,
+      openTaskEdit, saveTaskEdit, onTaskFieldChange, getPredecessorString, getTaskRowNumber, editingName,
       addResource, editResource, saveResource, deleteResource,
       openAssignResources, isResourceAssigned, getAssignmentUnits,
       toggleResourceAssignment, updateAssignmentUnits, getResourceNames,

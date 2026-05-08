@@ -115,9 +115,14 @@ const CSVManager = {
       const row = rows[i];
       if (row.every(cell => !cell.trim())) continue; // Saltar filas vacias
 
+      const rawStart = this.getCell(row, colMap.startDate);
+      const rawEnd = this.getCell(row, colMap.endDate);
+      const isValidDate = s => s && /^\d{4}-\d{2}-\d{2}$/.test(s.trim());
       const task = DataModel.createTask({
         name: this.getCell(row, colMap.name) || `Tarea ${i + 1}`,
         duration: parseInt(this.getCell(row, colMap.duration)) || 1,
+        startDate: isValidDate(rawStart) ? rawStart.trim() : null,
+        endDate: isValidDate(rawEnd) ? rawEnd.trim() : null,
         plannedCost: parseFloat(this.getCell(row, colMap.cost)) || 0,
         actualCost: parseFloat(this.getCell(row, colMap.actualCost)) || 0,
         percentComplete: parseInt(this.getCell(row, colMap.percentComplete)) || 0,

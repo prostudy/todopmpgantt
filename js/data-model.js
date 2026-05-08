@@ -15,6 +15,7 @@ const DataModel = {
       duration: overrides.duration ?? 1,
       startDate: overrides.startDate || null,
       endDate: overrides.endDate || null,
+      costOverride: overrides.costOverride ?? false,
       predecessors: overrides.predecessors || [], // [{taskId, type:'FS'|'FF'|'SS'|'SF', lag:0}]
       resourceAssignments: overrides.resourceAssignments || [], // [{resourceId, units: 100}]
       plannedCost: overrides.plannedCost ?? 0,
@@ -69,6 +70,8 @@ const DataModel = {
       duration: t.duration,
       plannedCost: t.plannedCost,
       percentComplete: t.percentComplete,
+      isMilestone: t.isMilestone,
+      actualCost: t.actualCost,
     }));
     return {
       id: DataModel.generateId(),
@@ -82,14 +85,19 @@ const DataModel = {
   /**
    * Crea un proyecto nuevo
    */
+  localDateStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+
   createProject(overrides = {}) {
     return {
       name: overrides.name || 'Nuevo Proyecto',
-      startDate: overrides.startDate || new Date().toISOString().split('T')[0],
+      startDate: overrides.startDate || DataModel.localDateStr(),
       tasks: overrides.tasks || [],
       resources: overrides.resources || [],
       baselines: overrides.baselines || [],
-      statusDate: overrides.statusDate || new Date().toISOString().split('T')[0],
+      statusDate: overrides.statusDate || DataModel.localDateStr(),
       calendarWorkdays: overrides.calendarWorkdays || [1, 2, 3, 4, 5], // Lun-Vie
       hoursPerDay: overrides.hoursPerDay ?? 8,
     };

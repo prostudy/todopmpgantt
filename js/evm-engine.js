@@ -37,14 +37,18 @@ const EVMEngine = {
     const CPI = AC !== 0 ? EV / AC : 1;  // Cost Performance Index
 
     // Estimaciones a completar
-    const EAC = BAC / CPI;  // Estimate at Completion
+    // Fallback cuando CPI=0 (nada ganado pero ya se gastó): resto del trabajo a presupuesto
+    const EAC = CPI > 0 ? BAC / CPI : AC + (BAC - EV);
     const ETC = EAC - AC;  // Estimate to Complete
     const VAC = BAC - EAC; // Variance at Completion
 
-    // TCPI - To-Complete Performance Index (basado en BAC)
-    const TCPI_BAC = (BAC - AC) !== 0 ? (BAC - EV) / (BAC - AC) : 0;
-    // TCPI basado en EAC
-    const TCPI_EAC = (EAC - AC) !== 0 ? (BAC - EV) / (EAC - AC) : 0;
+    // TCPI — null cuando el presupuesto está agotado (evita mostrar 0 o Infinity)
+    const TCPI_BAC = (BAC - AC) > 0
+      ? (BAC - EV) / (BAC - AC)
+      : (BAC - EV) > 0 ? null : 1;
+    const TCPI_EAC = (EAC - AC) > 0
+      ? (BAC - EV) / (EAC - AC)
+      : (BAC - EV) > 0 ? null : 1;
 
     // Porcentaje completado del proyecto
     const percentComplete = BAC > 0 ? (EV / BAC) * 100 : 0;
@@ -110,24 +114,39 @@ const EVMEngine = {
     // Encontrar rango de fechas
     const allDates = tasks
       .filter(t => t.startDate && t.endDate)
-      .flatMap(t => [new Date(t.startDate), new Date(t.endDate)]);
+      .flatMap(t => [new Date(t.startDate + 'T00:00:00'), new Date(t.endDate + 'T00:00:00')]);
 
     if (allDates.length === 0) return { labels: [], pv: [], ev: [], ac: [] };
 
     const minDate = new Date(Math.min(...allDates));
     const maxDate = new Date(Math.max(...allDates));
+    const statusDate = new Date(project.statusDate + 'T00:00:00');
 
-    // Generar puntos semanales
+    // Helper: fecha local como string YYYY-MM-DD (evita problemas de zona horaria)
+    const toLocalStr = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+    // Construir puntos semanales + siempre incluir la statusDate para capturar el estado real
+    const sampleMap = new Map();
+    const cur = new Date(minDate);
+    while (cur <= maxDate) {
+      const key = toLocalStr(cur);
+      if (!sampleMap.has(key)) sampleMap.set(key, new Date(cur));
+      cur.setDate(cur.getDate() + 7);
+    }
+    if (statusDate >= minDate && statusDate <= maxDate) {
+      const key = toLocalStr(statusDate);
+      if (!sampleMap.has(key)) sampleMap.set(key, new Date(statusDate));
+    }
+    const sampleDates = [...sampleMap.values()].sort((a, b) => a - b);
+
+    // Generar puntos
     const labels = [];
     const pvData = [];
     const evData = [];
     const acData = [];
 
-    const current = new Date(minDate);
-    const statusDate = new Date(project.statusDate + 'T00:00:00');
-
-    while (current <= maxDate) {
-      labels.push(current.toISOString().split('T')[0]);
+    for (const current of sampleDates) {
+      labels.push(toLocalStr(current));
 
       // PV acumulado a esta fecha
       let pv = 0;
@@ -149,26 +168,45 @@ const EVMEngine = {
       }
       pvData.push(Math.round(pv * 100) / 100);
 
-      // EV y AC solo hasta la fecha de estado
+      // EV y AC: solo hasta fecha de estado; null después para que la línea se detenga
       if (current <= statusDate) {
         const ev = tasks.reduce((sum, t) => {
-          if (!t.startDate) return sum;
+          if (!t.startDate || !t.endDate) return sum;
           const start = new Date(t.startDate + 'T00:00:00');
+          const end = new Date(t.endDate + 'T00:00:00');
           if (current < start) return sum;
-          return sum + ((t.percentComplete || 0) / 100) * (t.plannedCost || 0);
+          const pct = (t.percentComplete || 0) / 100;
+          // Distribuir EV proporcional al avance físico, pero ajustado al tiempo transcurrido
+          if (current >= end) return sum + pct * (t.plannedCost || 0);
+          if (current > start) {
+            const total = Math.max(1, ScheduleEngine.getWorkdaysBetween(start, end, project.calendarWorkdays));
+            const elapsed = ScheduleEngine.getWorkdaysBetween(start, current, project.calendarWorkdays);
+            return sum + pct * (t.plannedCost || 0) * (elapsed / total);
+          }
+          return sum;
         }, 0);
         evData.push(Math.round(ev * 100) / 100);
 
         const ac = tasks.reduce((sum, t) => {
-          if (!t.startDate) return sum;
+          if (!t.startDate || !t.endDate) return sum;
           const start = new Date(t.startDate + 'T00:00:00');
+          const end = new Date(t.endDate + 'T00:00:00');
           if (current < start) return sum;
-          return sum + (t.actualCost || 0);
+          if (current >= end) return sum + (t.actualCost || 0);
+          if (current > start) {
+            const total = Math.max(1, ScheduleEngine.getWorkdaysBetween(start, end, project.calendarWorkdays));
+            const elapsed = ScheduleEngine.getWorkdaysBetween(start, current, project.calendarWorkdays);
+            return sum + (t.actualCost || 0) * (elapsed / total);
+          }
+          return sum; // current == start → 0, igual que PV y EV
         }, 0);
         acData.push(Math.round(ac * 100) / 100);
+      } else {
+        // Relleno null para mantener longitud igual a pvData (la línea se detiene en statusDate)
+        evData.push(null);
+        acData.push(null);
       }
 
-      current.setDate(current.getDate() + 7); // Semanal
     }
 
     return { labels, pv: pvData, ev: evData, ac: acData };
@@ -216,6 +254,7 @@ const EVMEngine = {
   },
 
   round(value, decimals = 2) {
+    if (value === null || value === undefined || !isFinite(value)) return null;
     const factor = Math.pow(10, decimals);
     return Math.round(value * factor) / factor;
   },

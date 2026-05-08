@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check /Applications/MAMP/htdocs/gantt/todopmpgantt/js/app.js)",
+      "Bash(node --check /Applications/MAMP/htdocs/gantt/todopmpgantt/js/evm-engine.js)",
+      "Bash(xargs ls -la)"
+    ]
+  }
+}

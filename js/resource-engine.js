@@ -124,23 +124,26 @@ const ResourceEngine = {
 
       if ((taskToDelay.totalFloat || 0) <= 0) break;
 
+      // Helper local para evitar bug de zona horaria con toISOString()
+      const toLocalStr = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
       // Retrasar 1 dia
       const newStart = new Date(taskToDelay.startDate + 'T00:00:00');
       newStart.setDate(newStart.getDate() + 1);
-      // Saltar fines de semana
       while (!project.calendarWorkdays.includes(newStart.getDay())) {
         newStart.setDate(newStart.getDate() + 1);
       }
-      taskToDelay.startDate = newStart.toISOString().split('T')[0];
+      taskToDelay.startDate = toLocalStr(newStart);
 
       const newEnd = new Date(taskToDelay.endDate + 'T00:00:00');
       newEnd.setDate(newEnd.getDate() + 1);
       while (!project.calendarWorkdays.includes(newEnd.getDay())) {
         newEnd.setDate(newEnd.getDate() + 1);
       }
-      taskToDelay.endDate = newEnd.toISOString().split('T')[0];
+      taskToDelay.endDate = toLocalStr(newEnd);
 
-      // Recalcular
+      // Recalcular CPM completo para que totalFloat sea correcto en la siguiente iteración
+      ScheduleEngine.calculate(project);
       conflicts = this.detectOverallocation(project);
       iterations++;
     }

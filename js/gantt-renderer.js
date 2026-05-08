@@ -242,8 +242,8 @@ const GanttRenderer = {
     const cfg = this.config;
     if (!task.startDate || !task.endDate) return '';
 
-    const startDay = Math.ceil((new Date(task.startDate) - dates.start) / (1000 * 60 * 60 * 24));
-    const endDay = Math.ceil((new Date(task.endDate) - dates.start) / (1000 * 60 * 60 * 24));
+    const startDay = Math.ceil((new Date(task.startDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
+    const endDay = Math.ceil((new Date(task.endDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
     const x = startDay * unitWidth + 10;
     const width = Math.max((endDay - startDay) * unitWidth, task.isMilestone ? 0 : unitWidth);
     const y = rowIndex * cfg.rowHeight + (cfg.rowHeight - cfg.barHeight) / 2;
@@ -254,8 +254,8 @@ const GanttRenderer = {
     if (baseline) {
       const bTask = baseline.tasks.find(bt => bt.id === task.id);
       if (bTask && bTask.startDate && bTask.endDate) {
-        const bStartDay = Math.ceil((new Date(bTask.startDate) - dates.start) / (1000 * 60 * 60 * 24));
-        const bEndDay = Math.ceil((new Date(bTask.endDate) - dates.start) / (1000 * 60 * 60 * 24));
+        const bStartDay = Math.ceil((new Date(bTask.startDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
+        const bEndDay = Math.ceil((new Date(bTask.endDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
         const bx = bStartDay * unitWidth + 10;
         const bw = Math.max((bEndDay - bStartDay) * unitWidth, unitWidth);
         svg += `<rect x="${bx}" y="${y + cfg.barHeight - 4}" width="${bw}" height="4" rx="1" fill="${cfg.colors.baseline}" opacity="0.6" />`;
@@ -312,10 +312,10 @@ const GanttRenderer = {
     const cfg = this.config;
     if (!fromTask.startDate || !fromTask.endDate || !toTask.startDate || !toTask.endDate) return '';
 
-    const fromStartDay = Math.ceil((new Date(fromTask.startDate) - dates.start) / (1000 * 60 * 60 * 24));
-    const fromEndDay = Math.ceil((new Date(fromTask.endDate) - dates.start) / (1000 * 60 * 60 * 24));
-    const toStartDay = Math.ceil((new Date(toTask.startDate) - dates.start) / (1000 * 60 * 60 * 24));
-    const toEndDay = Math.ceil((new Date(toTask.endDate) - dates.start) / (1000 * 60 * 60 * 24));
+    const fromStartDay = Math.ceil((new Date(fromTask.startDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
+    const fromEndDay = Math.ceil((new Date(fromTask.endDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
+    const toStartDay = Math.ceil((new Date(toTask.startDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
+    const toEndDay = Math.ceil((new Date(toTask.endDate + 'T00:00:00') - dates.start) / (1000 * 60 * 60 * 24));
 
     let x1, y1, x2, y2;
     const midY = cfg.rowHeight / 2;
